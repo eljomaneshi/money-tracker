@@ -14,8 +14,9 @@ startSubscriptionCron();
 const allowedOrigins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://stellar-laughter-production-b5fc.up.railway.app",
-];
+    "https://moneytracker.online",
+    process.env.FRONTEND_URL,
+].filter((value, index, self): value is string => !!value && self.indexOf(value) === index);
 
 const corsOptions = {
     origin: (origin: string | undefined, callback: Function) => {
