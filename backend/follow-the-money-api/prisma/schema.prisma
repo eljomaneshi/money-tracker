@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                          Int      @id @default(autoincrement())
+  email                       String   @unique
+  passwordHash                String
+  fullName                    String?
+  totalsMainCurrency          String   @default("ALL")
+  showSecondCurrency          Boolean  @default(true)
+  secondCurrency              String?  @default("EUR")
+  notifySubscriptionReminder  Boolean  @default(true)
+  notifySubscriptionCreated   Boolean  @default(true)
+  notifySubscriptionCancelled Boolean  @default(true)
+  createdAt                   DateTime @default(now())
+
+  subscriptions       Subscription[]
+  expenses            Expense[]
+  accounts            Account[]
+  pendingEmailChanges PendingEmailChange[]
+}
+
+model EmailVerificationCode {
+  id        Int      @id @default(autoincrement())
+  email     String
+  codeHash  String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+model PendingEmailChange {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  newEmail  String
+  codeHash  String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([newEmail])
+}
+
+model Expense {
+  id          Int      @id @default(autoincrement())
+  amount      Float
+  date        DateTime
+  category    String
+  description String?
+  userId      Int
+  accountId   Int?
+  createdAt   DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+}
+
+enum BillingPeriod {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+}
+
+enum AccountType {
+  BANK
+  CASH
+  CRYPTO
+  BROKERAGE
+  OTHER
+}
+
+enum Currency {
+  ALL
+  EUR
+  GBP
+  USD
+}
+
+model Subscription {
+  id     Int  @id @default(autoincrement())
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name            String
+  price           Float
+  billingPeriod   String
+  nextBillingDate DateTime
+  status          String
+
+  accountId Int?
+  account   Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  reminder3DaysSentFor DateTime?
+  reminder1DaySentFor  DateTime?
+
+  createdAt DateTime @default(now())
+}
+
+model Account {
+  id     Int  @id @default(autoincrement())
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name         String
+  type         String
+  balance      Float
+  baseCurrency Currency @default(EUR)
+
+  expenses      Expense[]
+  subscriptions Subscription[]
+
+  createdAt DateTime @default(now())
+}
