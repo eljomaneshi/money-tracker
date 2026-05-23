@@ -22,7 +22,7 @@
     "jsonwebtoken": "9.0.3",
     "mysql2": "3.20.0",
     "node-cron": "4.2.1",
-    "nodemailer": "8.0.7"
+    "resend": "6.12.3"
   },
   "devDependencies": {
     "@types/bcrypt": "6.0.0",
@@ -30,7 +30,6 @@
     "@types/express": "5.0.6",
     "@types/jsonwebtoken": "9.0.10",
     "@types/node": "25.5.0",
-    "@types/nodemailer": "8.0.0",
     "eslint": "10.1.0",
     "nodemon": "3.1.14",
     "prettier": "3.8.1",
