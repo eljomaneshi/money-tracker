@@ -11,11 +11,29 @@ const app = express();
 
 startSubscriptionCron();
 
+const allowedOrigins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    process.env.FRONTEND_URL,
+    process.env.FRONTEND_URL_WWW,
+].filter(Boolean) as string[];
+
 app.use(
     cors({
-        origin: "http://localhost:5173",
+        origin: (origin, callback) => {
+            if (!origin) {
+                return callback(null, true);
+            }
+
+            if (allowedOrigins.includes(origin)) {
+                return callback(null, true);
+            }
+
+            return callback(new Error(`CORS blocked for origin: ${origin}`));
+        },
         methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization"],
+        credentials: true,
     })
 );
 
@@ -37,6 +55,11 @@ app.get("/health", (_req: Request, res: Response) => {
 app.use(
     (err: Error, _req: Request, res: Response, _next: NextFunction) => {
         console.error("Error:", err);
+
+        if (err.message.startsWith("CORS blocked")) {
+            return res.status(403).json({ error: err.message });
+        }
+
         res.status(500).json({ error: "Internal server error" });
     }
 );
