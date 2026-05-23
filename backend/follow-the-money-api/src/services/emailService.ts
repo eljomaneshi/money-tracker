@@ -1,33 +1,9 @@
-import nodemailer from "nodemailer";
-import {EMAIL_PORT, EMAIL_SECURE} from "../config";
+import { Resend } from "resend";
 
-function getTransporter() {
-    const EMAIL_HOST = process.env.EMAIL_HOST || "";
-    const EMAIL_USER = process.env.EMAIL_USER || "";
-    const EMAIL_PASS = process.env.EMAIL_PASS || "";
-    const EMAIL_FROM = process.env.EMAIL_FROM || EMAIL_USER;
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-    const isEmailConfigured =
-        !!EMAIL_HOST && !!EMAIL_PORT && !!EMAIL_USER && !!EMAIL_PASS;
-
-    if (!isEmailConfigured) {
-        throw new Error("Email is not configured. Check EMAIL_* environment variables.");
-    }
-
-    const transporter = nodemailer.createTransport({
-        host: EMAIL_HOST,
-        port: EMAIL_PORT,
-        secure: EMAIL_SECURE,
-        auth: {
-            user: EMAIL_USER,
-            pass: EMAIL_PASS,
-        },
-    });
-
-    return {
-        transporter,
-        emailFrom: EMAIL_FROM,
-    };
+function getEmailFrom() {
+    return process.env.EMAIL_FROM || "Money Tracker <onboarding@resend.dev>";
 }
 
 function formatDate(date: Date) {
@@ -47,11 +23,7 @@ function escapeHtml(value: string) {
         .replace(/'/g, "&#039;");
 }
 
-function buildStatusBadge(
-    label: string,
-    background: string,
-    color: string
-) {
+function buildStatusBadge(label: string, background: string, color: string) {
     return `
     <span style="
       display: inline-block;
@@ -164,6 +136,30 @@ function buildEmailLayout({
   `;
 }
 
+async function sendEmail({
+                             to,
+                             subject,
+                             html,
+                         }: {
+    to: string;
+    subject: string;
+    html: string;
+}) {
+    const { data, error } = await resend.emails.send({
+        from: getEmailFrom(),
+        to: [to],
+        subject,
+        html,
+    });
+
+    if (error) {
+        console.error("Resend error:", error);
+        throw new Error(error.message || "Failed to send email");
+    }
+
+    return data;
+}
+
 type ReminderEmailParams = {
     to: string;
     subscriptionName: string;
@@ -181,8 +177,6 @@ export async function sendSubscriptionReminderEmail({
                                                         linkedAccountName,
                                                         formattedAmount,
                                                     }: ReminderEmailParams) {
-    const {transporter, emailFrom} = getTransporter();
-
     const formattedDate = formatDate(nextBillingDate);
     const escapedName = escapeHtml(subscriptionName);
 
@@ -211,12 +205,7 @@ export async function sendSubscriptionReminderEmail({
         note: `Open <strong>Follow The Money</strong> to review the linked account balance and make sure everything is ready before the payment is processed.`,
     });
 
-    await transporter.sendMail({
-        from: emailFrom,
-        to,
-        subject,
-        html,
-    });
+    await sendEmail({ to, subject, html });
 }
 
 type CancelledEmailParams = {
@@ -232,8 +221,6 @@ export async function sendSubscriptionCancelledEmail({
                                                          linkedAccountName,
                                                          formattedAmount,
                                                      }: CancelledEmailParams) {
-    const {transporter, emailFrom} = getTransporter();
-
     const escapedName = escapeHtml(subscriptionName);
 
     const extraRows = `
@@ -256,12 +243,7 @@ export async function sendSubscriptionCancelledEmail({
         note: `You will no longer receive future renewal reminders for this subscription unless it is created again later.`,
     });
 
-    await transporter.sendMail({
-        from: emailFrom,
-        to,
-        subject,
-        html,
-    });
+    await sendEmail({ to, subject, html });
 }
 
 type CreatedEmailParams = {
@@ -281,8 +263,6 @@ export async function sendSubscriptionCreatedEmail({
                                                        linkedAccountName,
                                                        formattedAmount,
                                                    }: CreatedEmailParams) {
-    const {transporter, emailFrom} = getTransporter();
-
     const formattedDate = formatDate(nextBillingDate);
     const escapedName = escapeHtml(subscriptionName);
 
@@ -303,10 +283,5 @@ export async function sendSubscriptionCreatedEmail({
         note: `You will automatically receive reminder emails before renewal when this subscription reaches the 3-day and 1-day reminder windows.`,
     });
 
-    await transporter.sendMail({
-        from: emailFrom,
-        to,
-        subject,
-        html,
-    });
+    await sendEmail({ to, subject, html });
 }
