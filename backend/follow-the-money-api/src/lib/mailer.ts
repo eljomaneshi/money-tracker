@@ -1,35 +1,17 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || "smtp.gmail.com",
-    port: Number(process.env.EMAIL_PORT || 587),
-    secure: false,
-    requireTLS: true,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function sendVerificationCodeEmail(email: string, code: string) {
     console.log("sendVerificationCodeEmail start", {
         to: email,
-        host: process.env.EMAIL_HOST,
-        port: process.env.EMAIL_PORT,
-        userPresent: Boolean(process.env.EMAIL_USER),
-        passPresent: Boolean(process.env.EMAIL_PASS),
+        apiKeyPresent: Boolean(process.env.RESEND_API_KEY),
         fromPresent: Boolean(process.env.EMAIL_FROM),
     });
 
-    await transporter.verify();
-    console.log("SMTP verify ok");
-
-    const info = await transporter.sendMail({
-        from: process.env.EMAIL_FROM,
-        to: email,
+    const { data, error } = await resend.emails.send({
+        from: process.env.EMAIL_FROM || "Money Tracker <onboarding@resend.dev>",
+        to: [email],
         subject: "Your verification code",
         text: `Your verification code is: ${code}. It expires in 10 minutes.`,
         html: `
@@ -42,9 +24,10 @@ export async function sendVerificationCodeEmail(email: string, code: string) {
     `,
     });
 
-    console.log("sendMail ok", {
-        messageId: info.messageId,
-        accepted: info.accepted,
-        rejected: info.rejected,
-    });
+    if (error) {
+        console.error("Resend error:", error);
+        throw new Error(error.message || "Failed to send email");
+    }
+
+    console.log("Resend send ok", data);
 }
