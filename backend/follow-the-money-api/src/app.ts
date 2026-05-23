@@ -14,29 +14,27 @@ startSubscriptionCron();
 const allowedOrigins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    process.env.FRONTEND_URL,
-    process.env.FRONTEND_URL_WWW,
-].filter(Boolean) as string[];
+    "https://stellar-laughter-production-b5fc.up.railway.app",
+];
 
-app.use(
-    cors({
-        origin: (origin, callback) => {
-            if (!origin) {
-                return callback(null, true);
-            }
+const corsOptions = {
+    origin: (origin: string | undefined, callback: Function) => {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    credentials: true,
+    methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+    optionsSuccessStatus: 204,
+};
 
-            if (allowedOrigins.includes(origin)) {
-                console.log("Allowed CORS origins:", allowedOrigins);
-                return callback(null, true);
-            }
+app.use((req, res, next) => {
+    res.header("Vary", "Origin");
+    next();
+});
 
-            return callback(new Error(`CORS blocked for origin: ${origin}`));
-        },
-        methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
-        credentials: true,
-    })
-);
+app.options("*", cors(corsOptions));
+app.use(cors(corsOptions));
 
 app.use(express.json());
 
