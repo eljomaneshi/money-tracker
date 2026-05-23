@@ -26,6 +26,7 @@ app.use(
             }
 
             if (allowedOrigins.includes(origin)) {
+                console.log("Allowed CORS origins:", allowedOrigins);
                 return callback(null, true);
             }
 
