@@ -6,6 +6,8 @@ import subscriptionRoutes from "./routes/subscription.routes";
 import expenseRoutes from "./routes/expense.routes";
 import accountRoutes from "./routes/account.routes";
 import { startSubscriptionCron } from "./cron/subscriptionCron";
+import noteRoutes from "./routes/note.routes";
+import accountActionRoutes from "./routes/accountAction.routes";
 
 const app = express();
 
@@ -63,5 +65,8 @@ app.use(
         res.status(500).json({ error: "Internal server error" });
     }
 );
+
+app.use("/notes", noteRoutes);
+app.use("/account-actions", accountActionRoutes);
 
 export default app;

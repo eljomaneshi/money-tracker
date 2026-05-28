@@ -1,4 +1,3 @@
-// account.routes.ts
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
 import * as accountController from "../controllers/account.controller";

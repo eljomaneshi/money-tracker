@@ -2,10 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ChartPie,
   LayoutDashboard,
+  Plus,
   Receipt,
   Repeat,
   Wallet,
+  ArrowUpRight,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import api from "../lib/api";
 import { formatMoney } from "../utils/formatMoney";
 
@@ -104,7 +107,7 @@ function StatCard({
   iconWrapperClassName: string;
 }) {
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:bg-[#0f1b3d] dark:border-white/6 sm:p-8">
+    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#0f1b3d] sm:p-8">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -297,22 +300,37 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div>
-        <div className="flex items-center gap-3">
-          <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
-            <LayoutDashboard className="h-6 w-6" />
+      <div className="flex flex-col items-start gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+              <LayoutDashboard className="h-6 w-6" />
+            </div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 sm:text-4xl">
+              Dashboard
+            </h1>
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 sm:text-4xl">
-            Dashboard
-          </h1>
+
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 sm:text-base">
+            A quick overview of your balances, subscriptions, and monthly spending.
+          </p>
         </div>
 
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 sm:text-base">
-          A quick overview of your balances, subscriptions, and monthly spending.
-        </p>
+        <div className="flex w-full justify-center sm:justify-start">
+          <Link
+            to="/activity"
+            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+              <Plus className="h-4 w-4" />
+            </span>
+            <span>Add expense</span>
+            <ArrowUpRight className="h-4 w-4 opacity-60" />
+          </Link>
+        </div>
       </div>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:bg-[#0f1b3d] dark:border-white/6 sm:p-8">
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#0f1b3d] sm:p-8">
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
             <div className="flex items-center gap-3">

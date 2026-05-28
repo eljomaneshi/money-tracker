@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  ArrowLeftRight,
   Calendar,
   Filter,
   Pencil,
@@ -22,6 +23,22 @@ type Expense = {
   description?: string | null;
   accountId?: number | null;
 };
+
+type AccountActionType = "DEPOSIT" | "WITHDRAWAL" | "TRANSFER_OUT" | "TRANSFER_IN";
+
+type AccountAction = {
+  id: number;
+  accountId: number;
+  toAccountId?: number | null;
+  type: AccountActionType;
+  amount: number;
+  description?: string | null;
+  date: string;
+};
+
+type ActivityItem =
+  | { itemType: "EXPENSE"; data: Expense }
+  | { itemType: "ACCOUNT_ACTION"; data: AccountAction };
 
 type Account = {
   id: number;
@@ -79,6 +96,7 @@ const moneyPosition = (currency: Currency) =>
 
 export default function Expenses() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [accountActions, setAccountActions] = useState<AccountAction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [rates, setRates] = useState<ExchangeRates | null>(null);
   const [settings, setSettings] = useState<SettingsResponse | null>(null);
@@ -105,23 +123,27 @@ export default function Expenses() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [paidFromFilter, setPaidFromFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
 
   const fetchData = async () => {
     try {
       setLoading(true);
       setError("");
 
-      const [expensesRes, accountsRes, ratesRes, settingsRes] = await Promise.all([
-        api.get("/expenses"),
-        api.get("/accounts"),
-        api.get("/accounts/exchange-rates"),
-        api.get<SettingsResponse>("/users/me/settings"),
-      ]);
+      const [expensesRes, accountsRes, ratesRes, settingsRes, actionsRes] =
+        await Promise.all([
+          api.get("/expenses"),
+          api.get("/accounts"),
+          api.get("/accounts/exchange-rates"),
+          api.get<SettingsResponse>("/users/me/settings"),
+          api.get("/account-actions"),
+        ]);
 
       setExpenses(expensesRes.data.expenses || []);
       setAccounts(accountsRes.data.accounts || []);
       setRates(ratesRes.data.rates || null);
       setSettings(settingsRes.data || null);
+      setAccountActions(actionsRes.data.actions || []);
     } catch (err: any) {
       console.error(err);
       setError(err.response?.data?.error || "Failed to load data");
@@ -170,6 +192,49 @@ export default function Expenses() {
     return formatMoney(converted, secondCurrency, moneyPosition(secondCurrency));
   };
 
+  const getActionLabel = (type: AccountActionType) => {
+    switch (type) {
+      case "DEPOSIT":
+        return "Deposit";
+      case "WITHDRAWAL":
+        return "Withdrawal";
+      case "TRANSFER_OUT":
+        return "Transfer out";
+      case "TRANSFER_IN":
+        return "Transfer in";
+      default:
+        return "Action";
+    }
+  };
+
+  const getActivityAmount = (item: ActivityItem) => {
+    if (item.itemType === "EXPENSE") {
+      return formatExpenseAmount(item.data);
+    }
+
+    const action = item.data;
+    const account = getAccountById(action.accountId);
+    const currency = account?.baseCurrency || "EUR";
+    return formatMoney(action.amount, currency, moneyPosition(currency));
+  };
+
+  const getConvertedActivityAmount = (item: ActivityItem) => {
+    if (!rates || !showSecondCurrency) return null;
+
+    if (item.itemType === "EXPENSE") {
+      return formatConvertedExpenseAmount(item.data);
+    }
+
+    const action = item.data;
+    const account = getAccountById(action.accountId);
+    const sourceCurrency = account?.baseCurrency || "EUR";
+
+    if (sourceCurrency === secondCurrency) return null;
+
+    const converted = convertAmount(action.amount, sourceCurrency, secondCurrency, rates);
+    return formatMoney(converted, secondCurrency, moneyPosition(secondCurrency));
+  };
+
   const categoryOptions = useMemo(() => {
     return Array.from(
       new Set(
@@ -181,17 +246,52 @@ export default function Expenses() {
     ) as string[];
   }, [expenses]);
 
-  const filteredExpenses = useMemo(() => {
-    return expenses.filter((expense) => {
-      const matchesCategory = !categoryFilter || expense.category === categoryFilter;
-      const matchesPaidFrom =
-        !paidFromFilter || String(expense.accountId ?? "") === paidFromFilter;
-      const expenseDate = expense.date.slice(0, 10);
-      const matchesDate = !dateFilter || expenseDate === dateFilter;
+  const activityItems = useMemo<ActivityItem[]>(() => {
+    const expenseItems: ActivityItem[] = expenses.map((expense) => ({
+      itemType: "EXPENSE",
+      data: expense,
+    }));
 
-      return matchesCategory && matchesPaidFrom && matchesDate;
+    const actionItems: ActivityItem[] = accountActions.map((action) => ({
+      itemType: "ACCOUNT_ACTION",
+      data: action,
+    }));
+
+    return [...expenseItems, ...actionItems].sort((a, b) => {
+      return new Date(b.data.date).getTime() - new Date(a.data.date).getTime();
     });
-  }, [expenses, categoryFilter, paidFromFilter, dateFilter]);
+  }, [expenses, accountActions]);
+
+  const filteredActivity = useMemo(() => {
+    return activityItems.filter((item) => {
+      const itemDate = item.data.date.slice(0, 10);
+      const matchesDate = !dateFilter || itemDate === dateFilter;
+
+      if (item.itemType === "EXPENSE") {
+        const expense = item.data;
+        const matchesCategory = !categoryFilter || expense.category === categoryFilter;
+        const matchesPaidFrom =
+          !paidFromFilter || String(expense.accountId ?? "") === paidFromFilter;
+
+        const matchesType =
+          !typeFilter ||
+          typeFilter === "EXPENSE" ||
+          (typeFilter === "SUBSCRIPTION" && expense.category === "Subscriptions");
+
+        return matchesDate && matchesCategory && matchesPaidFrom && matchesType;
+      }
+
+      const action = item.data;
+      const matchesAccount =
+        !paidFromFilter ||
+        String(action.accountId) === paidFromFilter ||
+        String(action.toAccountId ?? "") === paidFromFilter;
+
+      const matchesType = !typeFilter || action.type === typeFilter;
+
+      return matchesDate && matchesAccount && matchesType;
+    });
+  }, [activityItems, categoryFilter, paidFromFilter, dateFilter, typeFilter]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -306,11 +406,11 @@ export default function Expenses() {
             <Receipt className="h-6 w-6" />
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 sm:text-4xl">
-            Expenses
+            Activity
           </h1>
         </div>
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 sm:text-base">
-          Track spending and edit transactions while keeping balances synced.
+          Track expenses, subscription charges, deposits, withdrawals, and transfers in one place.
         </p>
       </div>
 
@@ -437,10 +537,10 @@ export default function Expenses() {
           </div>
           <div>
             <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-              Recent Expenses
+              Recent Activity
             </h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Review transactions and edit incorrect entries.
+              Review your latest financial activity across expenses and balance actions.
             </p>
           </div>
         </div>
@@ -455,7 +555,7 @@ export default function Expenses() {
             </h3>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
                 Category
@@ -476,7 +576,7 @@ export default function Expenses() {
 
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Paid From
+                Account
               </label>
               <select
                 value={paidFromFilter}
@@ -506,19 +606,38 @@ export default function Expenses() {
                 />
               </div>
             </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Type
+              </label>
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+              >
+                <option value="">All activity</option>
+                <option value="EXPENSE">Expenses</option>
+                <option value="SUBSCRIPTION">Subscription payments</option>
+                <option value="DEPOSIT">Deposits</option>
+                <option value="WITHDRAWAL">Withdrawals</option>
+                <option value="TRANSFER_OUT">Transfers out</option>
+                <option value="TRANSFER_IN">Transfers in</option>
+              </select>
+            </div>
           </div>
 
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-slate-500 dark:text-slate-400">
               Showing{" "}
               <span className="font-semibold text-slate-900 dark:text-slate-100">
-                {filteredExpenses.length}
+                {filteredActivity.length}
               </span>{" "}
               of{" "}
               <span className="font-semibold text-slate-900 dark:text-slate-100">
-                {expenses.length}
+                {activityItems.length}
               </span>{" "}
-              expenses
+              activity items
             </p>
             <button
               type="button"
@@ -526,6 +645,7 @@ export default function Expenses() {
                 setCategoryFilter("");
                 setPaidFromFilter("");
                 setDateFilter("");
+                setTypeFilter("");
               }}
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >
@@ -537,9 +657,9 @@ export default function Expenses() {
 
         {loading ? (
           <p className="text-sm text-slate-400 dark:text-slate-500">Loading...</p>
-        ) : filteredExpenses.length === 0 ? (
+        ) : filteredActivity.length === 0 ? (
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            No expenses match the selected filters.
+            No activity matches the selected filters.
           </p>
         ) : (
           <>
@@ -549,26 +669,78 @@ export default function Expenses() {
                   <tr>
                     <th className="py-3 pr-4 font-medium">Description</th>
                     <th className="py-3 pr-4 font-medium">Amount</th>
-                    <th className="py-3 pr-4 font-medium">Category</th>
-                    <th className="py-3 pr-4 font-medium">Paid From</th>
+                    <th className="py-3 pr-4 font-medium">Type</th>
+                    <th className="py-3 pr-4 font-medium">Account</th>
                     <th className="py-3 pr-4 font-medium">Date</th>
                     <th className="py-3 text-right font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredExpenses.map((exp) => {
-                    const converted = formatConvertedExpenseAmount(exp);
+                  {filteredActivity.map((item) => {
+                    const converted = getConvertedActivityAmount(item);
+
+                    if (item.itemType === "EXPENSE") {
+                      const exp = item.data;
+
+                      return (
+                        <tr
+                          key={`expense-${exp.id}`}
+                          className="border-b border-slate-100 last:border-b-0 dark:border-slate-800"
+                        >
+                          <td className="py-4 pr-4 text-slate-900 dark:text-slate-100">
+                            {exp.description || "-"}
+                          </td>
+                          <td className="py-4 pr-4 font-semibold text-rose-600 dark:text-rose-400">
+                            <p>{formatExpenseAmount(exp)}</p>
+                            {converted && (
+                              <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                                {converted}
+                              </p>
+                            )}
+                          </td>
+                          <td className="py-4 pr-4 text-slate-700 dark:text-slate-300">
+                            {exp.category === "Subscriptions" ? "Subscription payment" : "Expense"}
+                          </td>
+                          <td className="py-4 pr-4 text-slate-700 dark:text-slate-300">
+                            {getAccountName(exp.accountId)}
+                          </td>
+                          <td className="py-4 pr-4 text-slate-700 dark:text-slate-300">
+                            {new Date(exp.date).toLocaleDateString()}
+                          </td>
+                          <td className="py-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(exp)}
+                              className="inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-600"
+                            >
+                              <Pencil className="h-4 w-4" />
+                              Edit
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    const action = item.data;
+                    const source = getAccountName(action.accountId);
+                    const target = getAccountName(action.toAccountId);
+                    const amountColor =
+                      action.type === "DEPOSIT"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : action.type === "WITHDRAWAL"
+                        ? "text-rose-600 dark:text-rose-400"
+                        : "text-blue-600 dark:text-blue-400";
 
                     return (
                       <tr
-                        key={exp.id}
+                        key={`action-${action.id}`}
                         className="border-b border-slate-100 last:border-b-0 dark:border-slate-800"
                       >
                         <td className="py-4 pr-4 text-slate-900 dark:text-slate-100">
-                          {exp.description || "-"}
+                          {action.description || getActionLabel(action.type)}
                         </td>
-                        <td className="py-4 pr-4 font-semibold text-slate-900 dark:text-slate-100">
-                          <p>{formatExpenseAmount(exp)}</p>
+                        <td className={`py-4 pr-4 font-semibold ${amountColor}`}>
+                          <p>{getActivityAmount(item)}</p>
                           {converted && (
                             <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                               {converted}
@@ -576,23 +748,18 @@ export default function Expenses() {
                           )}
                         </td>
                         <td className="py-4 pr-4 text-slate-700 dark:text-slate-300">
-                          {exp.category}
+                          {getActionLabel(action.type)}
                         </td>
                         <td className="py-4 pr-4 text-slate-700 dark:text-slate-300">
-                          {getAccountName(exp.accountId)}
+                          {action.type === "TRANSFER_OUT" || action.type === "TRANSFER_IN"
+                            ? `${source} → ${target}`
+                            : source}
                         </td>
                         <td className="py-4 pr-4 text-slate-700 dark:text-slate-300">
-                          {new Date(exp.date).toLocaleDateString()}
+                          {new Date(action.date).toLocaleDateString()}
                         </td>
                         <td className="py-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => openEditModal(exp)}
-                            className="inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-600"
-                          >
-                            <Pencil className="h-4 w-4" />
-                            Edit
-                          </button>
+                          <span className="text-sm text-slate-400 dark:text-slate-500">—</span>
                         </td>
                       </tr>
                     );
@@ -602,26 +769,96 @@ export default function Expenses() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 lg:hidden">
-              {filteredExpenses.map((exp) => {
-                const converted = formatConvertedExpenseAmount(exp);
+              {filteredActivity.map((item) => {
+                const converted = getConvertedActivityAmount(item);
+
+                if (item.itemType === "EXPENSE") {
+                  const exp = item.data;
+
+                  return (
+                    <div
+                      key={`expense-${exp.id}`}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950"
+                    >
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                            {exp.description || "No description"}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                            {exp.category === "Subscriptions" ? "Subscription payment" : exp.category}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-lg font-bold text-rose-600 dark:text-rose-400">
+                            {formatExpenseAmount(exp)}
+                          </p>
+                          {converted && (
+                            <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                              {converted}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <p className="text-slate-500 dark:text-slate-400">Account</p>
+                          <p className="font-semibold text-slate-900 dark:text-slate-100">
+                            {getAccountName(exp.accountId)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-slate-500 dark:text-slate-400">Date</p>
+                          <p className="font-semibold text-slate-900 dark:text-slate-100">
+                            {new Date(exp.date).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(exp)}
+                        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-600"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Edit
+                      </button>
+                    </div>
+                  );
+                }
+
+                const action = item.data;
+                const amountColor =
+                  action.type === "DEPOSIT"
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : action.type === "WITHDRAWAL"
+                    ? "text-rose-600 dark:text-rose-400"
+                    : "text-blue-600 dark:text-blue-400";
 
                 return (
                   <div
-                    key={exp.id}
+                    key={`action-${action.id}`}
                     className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950"
                   >
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                          {exp.description || "No description"}
-                        </p>
-                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                          {exp.category}
-                        </p>
+                      <div className="flex items-start gap-3">
+                        <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+                          <ArrowLeftRight className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                            {action.description || getActionLabel(action.type)}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                            {getActionLabel(action.type)}
+                          </p>
+                        </div>
                       </div>
+
                       <div>
-                        <p className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                          {formatExpenseAmount(exp)}
+                        <p className={`text-lg font-bold ${amountColor}`}>
+                          {getActivityAmount(item)}
                         </p>
                         {converted && (
                           <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
@@ -633,27 +870,20 @@ export default function Expenses() {
 
                     <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                       <div>
-                        <p className="text-slate-500 dark:text-slate-400">Paid From</p>
+                        <p className="text-slate-500 dark:text-slate-400">Account</p>
                         <p className="font-semibold text-slate-900 dark:text-slate-100">
-                          {getAccountName(exp.accountId)}
+                          {action.type === "TRANSFER_OUT" || action.type === "TRANSFER_IN"
+                            ? `${getAccountName(action.accountId)} → ${getAccountName(action.toAccountId)}`
+                            : getAccountName(action.accountId)}
                         </p>
                       </div>
                       <div>
                         <p className="text-slate-500 dark:text-slate-400">Date</p>
                         <p className="font-semibold text-slate-900 dark:text-slate-100">
-                          {new Date(exp.date).toLocaleDateString()}
+                          {new Date(action.date).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => openEditModal(exp)}
-                      className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-600"
-                    >
-                      <Pencil className="h-4 w-4" />
-                      Edit
-                    </button>
                   </div>
                 );
               })}

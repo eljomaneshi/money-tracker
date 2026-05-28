@@ -24,6 +24,8 @@ model User {
   expenses            Expense[]
   accounts            Account[]
   pendingEmailChanges PendingEmailChange[]
+  accountActions      AccountAction[]
+  notes               Note[]
 }
 
 model EmailVerificationCode {
@@ -80,7 +82,6 @@ enum AccountType {
   BANK
   CASH
   CRYPTO
-  BROKERAGE
   OTHER
 }
 
@@ -89,6 +90,32 @@ enum Currency {
   EUR
   GBP
   USD
+}
+
+enum AccountActionType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER_OUT
+  TRANSFER_IN
+}
+
+enum NoteType {
+  GENERAL
+  TO_RECEIVE
+  TO_PAY
+  REMINDER
+}
+
+enum NoteStatus {
+  OPEN
+  DONE
+  CANCELLED
+}
+
+enum RepeatPeriod {
+  NONE
+  MONTHLY
+  YEARLY
 }
 
 model Subscription {
@@ -117,12 +144,54 @@ model Account {
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   name         String
-  type         String
+  type         AccountType
   balance      Float
-  baseCurrency Currency @default(EUR)
+  baseCurrency Currency    @default(EUR)
 
-  expenses      Expense[]
-  subscriptions Subscription[]
+  expenses        Expense[]
+  subscriptions   Subscription[]
+  outgoingActions AccountAction[] @relation("ActionFromAccount")
+  incomingActions AccountAction[] @relation("ActionToAccount")
 
   createdAt DateTime @default(now())
+}
+
+model AccountAction {
+  id          Int               @id @default(autoincrement())
+  userId      Int
+  accountId   Int
+  toAccountId Int?
+  type        AccountActionType
+  amount      Float
+  description String?
+  date        DateTime
+  createdAt   DateTime          @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account   Account  @relation("ActionFromAccount", fields: [accountId], references: [id], onDelete: Cascade)
+  toAccount Account? @relation("ActionToAccount", fields: [toAccountId], references: [id], onDelete: SetNull)
+
+  @@index([userId, date])
+  @@index([accountId])
+  @@index([toAccountId])
+}
+
+model Note {
+  id           Int          @id @default(autoincrement())
+  userId       Int
+  title        String
+  description  String?      @db.Text
+  amount       Float?
+  personName   String?
+  dueDate      DateTime?
+  repeatPeriod RepeatPeriod @default(NONE)
+  type         NoteType     @default(GENERAL)
+  status       NoteStatus   @default(OPEN)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, dueDate])
 }

@@ -1,11 +1,5 @@
-import { useEffect, useState } from "react";
-import {
-  BellRing,
-  Plus,
-  Repeat,
-  RotateCcw,
-  XCircle,
-} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { RefreshCcw, Repeat, Plus, XCircle } from "lucide-react";
 import api from "../lib/api";
 import { formatMoney } from "../utils/formatMoney";
 
@@ -39,7 +33,7 @@ type ExchangeRates = {
   USD: number;
 };
 
-type SettingsResponse = {
+type UserSettings = {
   email: string;
   fullName: string | null;
   totalsMainCurrency: Currency;
@@ -75,243 +69,41 @@ const convertAmount = (
   return to === "EUR" ? amountInEur : amountInEur * toRate;
 };
 
-const moneyPosition = (currency: Currency) =>
-  currency === "ALL" ? "after" : "before";
-
-function SubscriptionSection({
-  title,
-  description,
-  subscriptions,
-  loading,
-  getAccountName,
-  formatSubscriptionPrice,
-  formatConvertedPrice,
-  onCancel,
-  emptyText,
-  icon: Icon,
-}: {
-  title: string;
-  description: string;
-  subscriptions: Subscription[];
-  loading: boolean;
-  getAccountName: (accountId?: number | null) => string;
-  formatSubscriptionPrice: (sub: Subscription) => string;
-  formatConvertedPrice: (sub: Subscription) => string | null;
-  onCancel?: (id: number) => void;
-  emptyText: string;
-  icon: React.ComponentType<{ className?: string }>;
-}) {
-  return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
-      <div className="mb-6 flex items-start gap-3">
-        <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
-          <Icon className="h-5 w-5" />
-        </div>
-        <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-            {title}
-          </h2>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            {description}
-          </p>
-        </div>
-      </div>
-
-      {loading ? (
-        <p className="text-sm text-slate-400 dark:text-slate-500">Loading...</p>
-      ) : subscriptions.length === 0 ? (
-        <p className="text-sm text-slate-500 dark:text-slate-400">{emptyText}</p>
-      ) : (
-        <>
-          <div className="hidden overflow-x-auto lg:block">
-            <table className="min-w-full text-left">
-              <thead className="border-b border-slate-200 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
-                <tr>
-                  <th className="py-3 pr-4 font-medium">Name</th>
-                  <th className="py-3 pr-4 font-medium">Price</th>
-                  <th className="py-3 pr-4 font-medium">Billing</th>
-                  <th className="py-3 pr-4 font-medium">Next billing date</th>
-                  <th className="py-3 pr-4 font-medium">Paid from</th>
-                  <th className="py-3 pr-4 font-medium">Status</th>
-                  <th className="py-3 text-right font-medium">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {subscriptions.map((sub) => {
-                  const converted = formatConvertedPrice(sub);
-
-                  return (
-                    <tr
-                      key={sub.id}
-                      className="border-b border-slate-100 last:border-b-0 dark:border-slate-800"
-                    >
-                      <td className="py-4 pr-4 text-slate-900 dark:text-slate-100">
-                        {sub.name}
-                      </td>
-                      <td className="py-4 pr-4">
-                        <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                          {formatSubscriptionPrice(sub)}
-                        </p>
-                        {converted && (
-                          <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                            {converted}
-                          </p>
-                        )}
-                      </td>
-                      <td className="py-4 pr-4 text-slate-700 dark:text-slate-300">
-                        {sub.billingPeriod === "MONTHLY" ? "Monthly" : "Yearly"}
-                      </td>
-                      <td className="py-4 pr-4 text-slate-700 dark:text-slate-300">
-                        {new Date(sub.nextBillingDate).toLocaleDateString()}
-                      </td>
-                      <td className="py-4 pr-4 text-slate-700 dark:text-slate-300">
-                        {getAccountName(sub.accountId)}
-                      </td>
-                      <td className="py-4 pr-4">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            sub.status === "ACTIVE"
-                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                              : "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                          }`}
-                        >
-                          {sub.status === "ACTIVE" ? "Active" : "Cancelled"}
-                        </span>
-                      </td>
-                      <td className="py-4 text-right">
-                        {onCancel && sub.status === "ACTIVE" ? (
-                          <button
-                            type="button"
-                            onClick={() => onCancel(sub.id)}
-                            className="inline-flex items-center gap-2 rounded-2xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
-                          >
-                            <XCircle className="h-4 w-4" />
-                            Cancel
-                          </button>
-                        ) : (
-                          <span className="text-sm text-slate-400 dark:text-slate-500">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 lg:hidden">
-            {subscriptions.map((sub) => {
-              const converted = formatConvertedPrice(sub);
-
-              return (
-                <div
-                  key={sub.id}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950"
-                >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                        {sub.name}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                        {sub.billingPeriod === "MONTHLY" ? "Monthly" : "Yearly"}
-                      </p>
-                    </div>
-
-                    <div className="text-right sm:text-left">
-                      <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                        {formatSubscriptionPrice(sub)}
-                      </p>
-                      {converted && (
-                        <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                          {converted}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <p className="text-slate-500 dark:text-slate-400">Paid from</p>
-                      <p className="font-semibold text-slate-900 dark:text-slate-100">
-                        {getAccountName(sub.accountId)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-slate-500 dark:text-slate-400">Next billing date</p>
-                      <p className="font-semibold text-slate-900 dark:text-slate-100">
-                        {new Date(sub.nextBillingDate).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-slate-500 dark:text-slate-400">Status</p>
-                      <p
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          sub.status === "ACTIVE"
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                            : "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                        }`}
-                      >
-                        {sub.status === "ACTIVE" ? "Active" : "Cancelled"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {onCancel && sub.status === "ACTIVE" && (
-                    <button
-                      type="button"
-                      onClick={() => onCancel(sub.id)}
-                      className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
-                    >
-                      <XCircle className="h-4 w-4" />
-                      Cancel subscription
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </section>
-  );
-}
-
 export default function Subscriptions() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [rates, setRates] = useState<ExchangeRates | null>(null);
-  const [settings, setSettings] = useState<SettingsResponse | null>(null);
+  const [settings, setSettings] = useState<UserSettings | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("MONTHLY");
   const [nextBillingDate, setNextBillingDate] = useState("");
-  const [selectedAccountId, setSelectedAccountId] = useState<number | "">("");
-  const [submitting, setSubmitting] = useState(false);
+  const [accountId, setAccountId] = useState<number | "">("");
 
   const fetchData = async () => {
     try {
       setLoading(true);
       setError("");
 
-      const [subscriptionsRes, accountsRes, ratesRes, settingsRes] = await Promise.all([
+      const [subsRes, accountsRes, ratesRes, settingsRes] = await Promise.all([
         api.get("/subscriptions"),
         api.get("/accounts"),
         api.get("/accounts/exchange-rates"),
-        api.get<SettingsResponse>("/users/me/settings"),
+        api.get("/users/me/settings"),
       ]);
 
-      setSubscriptions(subscriptionsRes.data.subscriptions || []);
+      setSubscriptions(subsRes.data.subscriptions || []);
       setAccounts(accountsRes.data.accounts || []);
       setRates(ratesRes.data.rates || null);
       setSettings(settingsRes.data || null);
     } catch (err: any) {
       console.error(err);
-      setError(err.response?.data?.error || "Failed to load data");
+      setError(err.response?.data?.error || "Failed to load subscriptions");
     } finally {
       setLoading(false);
     }
@@ -321,55 +113,63 @@ export default function Subscriptions() {
     fetchData();
   }, []);
 
+  const mainCurrency: Currency = settings?.totalsMainCurrency || "ALL";
   const showSecondCurrency = settings?.showSecondCurrency ?? true;
   const secondCurrency: Currency =
-    settings?.secondCurrency && settings.secondCurrency !== settings.totalsMainCurrency
+    settings?.secondCurrency && settings.secondCurrency !== mainCurrency
       ? settings.secondCurrency
-      : settings?.totalsMainCurrency === "ALL"
+      : mainCurrency === "ALL"
       ? "EUR"
       : "ALL";
 
-  const getAccountById = (accountId?: number | null) => {
-    if (!accountId) return null;
-    return accounts.find((acc) => acc.id === accountId) || null;
-  };
+  const getAccountById = (id?: number | null) =>
+    accounts.find((acc) => acc.id === id);
 
-  const getAccountName = (accountId?: number | null) => {
-    const account = getAccountById(accountId);
-    return account ? account.name : "—";
-  };
-
-  const getAccountCurrency = (accountId?: number | null): Currency => {
-    const account = getAccountById(accountId);
-    return account?.baseCurrency || "EUR";
+  const getAccountName = (id?: number | null) => {
+    if (!id) return "No account";
+    return getAccountById(id)?.name || "Unknown account";
   };
 
   const formatSubscriptionPrice = (sub: Subscription) => {
-    const currency = getAccountCurrency(sub.accountId);
-    return formatMoney(sub.price, currency, moneyPosition(currency));
+    const accountCurrency = getAccountById(sub.accountId)?.baseCurrency || "EUR";
+    return formatMoney(
+      sub.price,
+      accountCurrency,
+      accountCurrency === "ALL" ? "after" : "before"
+    );
   };
 
-  const formatConvertedPrice = (sub: Subscription) => {
-    if (!rates || !showSecondCurrency) return null;
+  const getConvertedPrice = (sub: Subscription) => {
+    if (!rates) return null;
 
-    const sourceCurrency = getAccountCurrency(sub.accountId);
-    if (sourceCurrency === secondCurrency) return null;
+    const accountCurrency = getAccountById(sub.accountId)?.baseCurrency || "EUR";
+    if (accountCurrency === secondCurrency) return null;
 
-    const converted = convertAmount(sub.price, sourceCurrency, secondCurrency, rates);
-    return formatMoney(converted, secondCurrency, moneyPosition(secondCurrency));
+    const converted = convertAmount(sub.price, accountCurrency, secondCurrency, rates);
+
+    return formatMoney(
+      converted,
+      secondCurrency,
+      secondCurrency === "ALL" ? "after" : "before"
+    );
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const activeSubscriptions = useMemo(
+    () => subscriptions.filter((sub) => sub.status === "ACTIVE"),
+    [subscriptions]
+  );
+
+  const cancelledSubscriptions = useMemo(
+    () => subscriptions.filter((sub) => sub.status === "CANCELLED"),
+    [subscriptions]
+  );
+
+  const handleCreateSubscription = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (!name || !price || !billingPeriod || !nextBillingDate) {
-      setError("Please fill all fields");
-      return;
-    }
-
-    if (!selectedAccountId) {
-      setError("Please select the account/resource");
+    if (!name.trim() || !price || !nextBillingDate) {
+      setError("Please fill name, price, and next billing date");
       return;
     }
 
@@ -377,18 +177,18 @@ export default function Subscriptions() {
       setSubmitting(true);
 
       await api.post("/subscriptions", {
-        name,
+        name: name.trim(),
         price: Number(price),
         billingPeriod,
         nextBillingDate,
-        accountId: selectedAccountId,
+        accountId: accountId || undefined,
       });
 
       setName("");
       setPrice("");
       setBillingPeriod("MONTHLY");
       setNextBillingDate("");
-      setSelectedAccountId("");
+      setAccountId("");
 
       await fetchData();
     } catch (err: any) {
@@ -401,8 +201,7 @@ export default function Subscriptions() {
 
   const handleCancelSubscription = async (id: number) => {
     try {
-      setError("");
-      await api.patch(`/subscriptions/${id}/cancel`);
+      await api.put(`/subscriptions/${id}/cancel`);
       await fetchData();
     } catch (err: any) {
       console.error(err);
@@ -410,36 +209,174 @@ export default function Subscriptions() {
     }
   };
 
-  const activeSubs = subscriptions.filter((sub) => sub.status === "ACTIVE");
-  const cancelledSubs = subscriptions.filter((sub) => sub.status === "CANCELLED");
+  const renderRows = (
+    items: Subscription[],
+    emptyText: string,
+    showCancel: boolean
+  ) => {
+    if (loading) {
+      return (
+        <div className="px-6 py-8 text-sm text-slate-400 dark:text-slate-500">
+          Loading...
+        </div>
+      );
+    }
+
+    if (items.length === 0) {
+      return (
+        <div className="px-6 py-8 text-sm text-slate-500 dark:text-slate-400">
+          {emptyText}
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <div className="hidden grid-cols-6 gap-4 border-b border-slate-200 px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400 lg:grid">
+          <div>Description</div>
+          <div>Amount</div>
+          <div>Type</div>
+          <div>Account</div>
+          <div>Date</div>
+          <div className="text-right">Actions</div>
+        </div>
+
+        <div className="divide-y divide-slate-200 dark:divide-slate-800">
+          {items.map((sub) => {
+            const converted = showSecondCurrency ? getConvertedPrice(sub) : null;
+
+            return (
+              <div key={sub.id}>
+                <div className="hidden grid-cols-6 gap-4 px-6 py-5 lg:grid lg:items-center">
+<div className="min-w-0">
+  <p className="truncate font-semibold text-slate-900 dark:text-slate-100">
+    {sub.name}
+  </p>
+</div>
+
+                  <div>
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">
+                      {formatSubscriptionPrice(sub)}
+                    </p>
+                    {converted && (
+                      <p className="mt-1 text-sm text-blue-700 dark:text-blue-400">
+                        {converted}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="text-slate-900 dark:text-slate-100">
+                    {sub.billingPeriod === "MONTHLY" ? "Monthly" : "Yearly"}
+                  </div>
+
+                  <div className="text-slate-900 dark:text-slate-100">
+                    {getAccountName(sub.accountId)}
+                  </div>
+
+                  <div className="text-slate-900 dark:text-slate-100">
+                    {new Date(sub.nextBillingDate).toLocaleDateString()}
+                  </div>
+
+                  <div className="flex justify-end">
+                    {showCancel ? (
+                      <button
+                        type="button"
+                        onClick={() => handleCancelSubscription(sub.id)}
+                        className="inline-flex items-center gap-2 rounded-2xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700"
+                      >
+                        <XCircle className="h-4 w-4" />
+                        Cancel
+                      </button>
+                    ) : (
+                      <span className="text-sm text-slate-400 dark:text-slate-500">—</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-4 px-5 py-5 lg:hidden">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-slate-900 dark:text-slate-100">
+                        {sub.name}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        {sub.billingPeriod === "MONTHLY" ? "Monthly" : "Yearly"}
+                      </p>
+                    </div>
+
+                    <div className="text-right">
+                      <p className="font-semibold text-slate-900 dark:text-slate-100">
+                        {formatSubscriptionPrice(sub)}
+                      </p>
+                      {converted && (
+                        <p className="mt-1 text-sm text-blue-700 dark:text-blue-400">
+                          {converted}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-slate-500 dark:text-slate-400">Account</p>
+                      <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">
+                        {getAccountName(sub.accountId)}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-slate-500 dark:text-slate-400">Date</p>
+                      <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">
+                        {new Date(sub.nextBillingDate).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  {showCancel && (
+                    <button
+                      type="button"
+                      onClick={() => handleCancelSubscription(sub.id)}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
+                    >
+                      <XCircle className="h-4 w-4" />
+                      Cancel subscription
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </>
+    );
+  };
 
   return (
     <div className="space-y-6 sm:space-y-8">
       <div>
         <div className="flex items-center gap-3">
           <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
-            <BellRing className="h-6 w-6" />
+            <Repeat className="h-6 w-6" />
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 sm:text-4xl">
             Subscriptions
           </h1>
         </div>
+
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 sm:text-base">
           Track recurring payments and the account they are paid from.
         </p>
       </div>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mb-6 flex items-start gap-3">
+          <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+            <Plus className="h-5 w-5" />
+          </div>
           <div>
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
-                <Plus className="h-5 w-5" />
-              </div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                Add Subscription
-              </h2>
-            </div>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+              Add New Subscription
+            </h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               Add recurring services like Netflix, Spotify, or utilities.
             </p>
@@ -453,12 +390,12 @@ export default function Subscriptions() {
         )}
 
         <form
-          onSubmit={handleSubmit}
-          className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5"
+          onSubmit={handleCreateSubscription}
+          className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6"
         >
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Name
+              Description
             </label>
             <input
               value={name}
@@ -470,7 +407,7 @@ export default function Subscriptions() {
 
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Price
+              Amount
             </label>
             <input
               type="number"
@@ -484,7 +421,7 @@ export default function Subscriptions() {
 
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Billing period
+              Type
             </label>
             <select
               value={billingPeriod}
@@ -498,7 +435,25 @@ export default function Subscriptions() {
 
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Next billing date
+              Account
+            </label>
+            <select
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : "")}
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+            >
+              <option value="">Select account</option>
+              {accounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Date
             </label>
             <input
               type="date"
@@ -508,31 +463,11 @@ export default function Subscriptions() {
             />
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Paid From
-            </label>
-            <select
-              value={selectedAccountId}
-              onChange={(e) =>
-                setSelectedAccountId(e.target.value ? Number(e.target.value) : "")
-              }
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-            >
-              <option value="">Select account</option>
-              {accounts.map((acc) => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.name} ({acc.baseCurrency})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="xl:col-span-5">
+          <div className="flex items-end">
             <button
               type="submit"
               disabled={submitting}
-              className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300 dark:disabled:bg-blue-900/40"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300 dark:disabled:bg-blue-900/40"
             >
               <Plus className="h-4 w-4" />
               {submitting ? "Adding..." : "Add subscription"}
@@ -541,30 +476,45 @@ export default function Subscriptions() {
         </form>
       </section>
 
-      <SubscriptionSection
-        title="Active Subscriptions"
-        description="Ongoing recurring payments linked to your accounts."
-        subscriptions={activeSubs}
-        loading={loading}
-        getAccountName={getAccountName}
-        formatSubscriptionPrice={formatSubscriptionPrice}
-        formatConvertedPrice={formatConvertedPrice}
-        onCancel={handleCancelSubscription}
-        emptyText="No active subscriptions yet."
-        icon={Repeat}
-      />
+      <section className="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="border-b border-slate-200 px-6 py-5 dark:border-slate-800 sm:px-8">
+          <div className="flex items-start gap-3">
+            <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+              <RefreshCcw className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                Active Subscriptions
+              </h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Ongoing recurring payments linked to your accounts.
+              </p>
+            </div>
+          </div>
+        </div>
 
-      <SubscriptionSection
-        title="Cancelled Subscriptions"
-        description="Previously cancelled subscriptions kept for reference."
-        subscriptions={cancelledSubs}
-        loading={loading}
-        getAccountName={getAccountName}
-        formatSubscriptionPrice={formatSubscriptionPrice}
-        formatConvertedPrice={formatConvertedPrice}
-        emptyText="No canceled subscriptions yet."
-        icon={RotateCcw}
-      />
+        {renderRows(activeSubscriptions, "No active subscriptions.", true)}
+      </section>
+
+      <section className="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="border-b border-slate-200 px-6 py-5 dark:border-slate-800 sm:px-8">
+          <div className="flex items-start gap-3">
+            <div className="rounded-2xl bg-slate-200 p-2.5 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+              <RefreshCcw className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                Cancelled Subscriptions
+              </h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Previously cancelled subscriptions kept for reference.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {renderRows(cancelledSubscriptions, "No cancelled subscriptions.", false)}
+      </section>
     </div>
   );
 }
