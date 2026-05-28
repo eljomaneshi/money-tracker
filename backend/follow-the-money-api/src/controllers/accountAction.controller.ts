@@ -159,11 +159,12 @@ export async function withdrawFromAccount(req: AuthRequest, res: Response) {
 export async function transferBetweenAccounts(req: AuthRequest, res: Response) {
     if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
-    const { fromAccountId, toAccountId, amount, description, date } = req.body;
+    const { fromAccountId, toAccountId, amount, targetAmount, description, date } = req.body;
 
     const parsedFromAccountId = Number(fromAccountId);
     const parsedToAccountId = Number(toAccountId);
     const parsedAmount = Number(amount);
+    const parsedTargetAmount = Number(targetAmount);
 
     if (Number.isNaN(parsedFromAccountId) || Number.isNaN(parsedToAccountId)) {
         return res.status(400).json({ message: "Invalid account ids" });
@@ -174,7 +175,11 @@ export async function transferBetweenAccounts(req: AuthRequest, res: Response) {
     }
 
     if (Number.isNaN(parsedAmount) || parsedAmount <= 0) {
-        return res.status(400).json({ message: "Amount must be greater than 0" });
+        return res.status(400).json({ message: "Sent amount must be greater than 0" });
+    }
+
+    if (Number.isNaN(parsedTargetAmount) || parsedTargetAmount <= 0) {
+        return res.status(400).json({ message: "Received amount must be greater than 0" });
     }
 
     if (!date) {
@@ -201,6 +206,15 @@ export async function transferBetweenAccounts(req: AuthRequest, res: Response) {
                 throw new Error("Account not found");
             }
 
+            if (fromAccount.balance < parsedAmount) {
+                throw new Error("Insufficient balance in source account");
+            }
+
+            const sameCurrency = fromAccount.baseCurrency === toAccount.baseCurrency;
+            const safeTargetAmount = sameCurrency ? parsedAmount : parsedTargetAmount;
+            const exchangeRate =
+                sameCurrency ? 1 : parsedTargetAmount / parsedAmount;
+
             const updatedFromAccount = await tx.account.update({
                 where: { id: fromAccount.id },
                 data: {
@@ -214,7 +228,7 @@ export async function transferBetweenAccounts(req: AuthRequest, res: Response) {
                 where: { id: toAccount.id },
                 data: {
                     balance: {
-                        increment: parsedAmount,
+                        increment: safeTargetAmount,
                     },
                 },
             });
@@ -226,6 +240,8 @@ export async function transferBetweenAccounts(req: AuthRequest, res: Response) {
                     toAccountId: toAccount.id,
                     type: "TRANSFER_OUT",
                     amount: parsedAmount,
+                    targetAmount: safeTargetAmount,
+                    exchangeRate,
                     description: description || null,
                     date: new Date(date),
                 },
@@ -237,7 +253,9 @@ export async function transferBetweenAccounts(req: AuthRequest, res: Response) {
                     accountId: toAccount.id,
                     toAccountId: fromAccount.id,
                     type: "TRANSFER_IN",
-                    amount: parsedAmount,
+                    amount: safeTargetAmount,
+                    targetAmount: parsedAmount,
+                    exchangeRate,
                     description: description || null,
                     date: new Date(date),
                 },

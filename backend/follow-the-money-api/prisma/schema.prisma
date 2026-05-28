@@ -157,15 +157,17 @@ model Account {
 }
 
 model AccountAction {
-  id          Int               @id @default(autoincrement())
-  userId      Int
-  accountId   Int
-  toAccountId Int?
-  type        AccountActionType
-  amount      Float
-  description String?
-  date        DateTime
-  createdAt   DateTime          @default(now())
+  id           Int               @id @default(autoincrement())
+  userId       Int
+  accountId    Int
+  toAccountId  Int?
+  type         AccountActionType
+  amount       Float
+  targetAmount Float?
+  exchangeRate Float?
+  description  String?
+  date         DateTime
+  createdAt    DateTime          @default(now())
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   account   Account  @relation("ActionFromAccount", fields: [accountId], references: [id], onDelete: Cascade)
@@ -182,6 +184,7 @@ model Note {
   title        String
   description  String?      @db.Text
   amount       Float?
+  currency     Currency     @default(EUR)
   personName   String?
   dueDate      DateTime?
   repeatPeriod RepeatPeriod @default(NONE)
