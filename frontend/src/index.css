@@ -16,15 +16,6 @@ body {
 input[type="date"] {
   width: 100%;
   min-width: 0;
-  appearance: auto;
   -webkit-appearance: auto;
-}
-
-input[type="date"]::-webkit-calendar-picker-indicator {
-  opacity: 1;
-  position: static;
-  width: auto;
-  height: auto;
-  margin: 0;
-  cursor: pointer;
+  appearance: auto;
 }
