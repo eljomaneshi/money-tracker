@@ -6,7 +6,6 @@ import {
     Save,
     Trash2,
     X,
-    Calendar,
     Clock3,
 } from "lucide-react";
 import api from "../lib/api";
@@ -716,20 +715,17 @@ export default function Notes() {
                                         </select>
                                     </div>
 
-                                    <div>
-                                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                            Due Date
-                                        </label>
-                                        <div className="relative w-full min-w-0">
-                                            <Calendar className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-                                            <input
-                                                type="date"
-                                                value={editDueDate}
-                                                onChange={(e) => setEditDueDate(e.target.value)}
-                                                className="w-full min-w-0 appearance-none rounded-2xl border border-slate-200/80 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:bg-slate-950 dark:focus:ring-blue-900/40"
-                                            />
-                                        </div>
-                                    </div>
+<div className="min-w-0">
+  <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+    Due Date
+  </label>
+  <input
+    type="date"
+    value={editDueDate}
+    onChange={(e) => setEditDueDate(e.target.value)}
+    className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+  />
+</div>
 
                                     <div className="md:col-span-2 xl:col-span-2">
                                         <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
