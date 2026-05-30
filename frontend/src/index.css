@@ -12,3 +12,16 @@ body {
   background-color: #f8fafc;
   color: #0f172a;
 }
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+}

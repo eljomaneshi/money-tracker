@@ -119,8 +119,8 @@ export default function Subscriptions() {
     settings?.secondCurrency && settings.secondCurrency !== mainCurrency
       ? settings.secondCurrency
       : mainCurrency === "ALL"
-      ? "EUR"
-      : "ALL";
+        ? "EUR"
+        : "ALL";
 
   const getAccountById = (id?: number | null) =>
     accounts.find((acc) => acc.id === id);
@@ -248,11 +248,11 @@ export default function Subscriptions() {
             return (
               <div key={sub.id}>
                 <div className="hidden grid-cols-6 gap-4 px-6 py-5 lg:grid lg:items-center">
-<div className="min-w-0">
-  <p className="truncate font-semibold text-slate-900 dark:text-slate-100">
-    {sub.name}
-  </p>
-</div>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-slate-900 dark:text-slate-100">
+                      {sub.name}
+                    </p>
+                  </div>
 
                   <div>
                     <p className="font-semibold text-slate-900 dark:text-slate-100">
@@ -459,7 +459,7 @@ export default function Subscriptions() {
               type="date"
               value={nextBillingDate}
               onChange={(e) => setNextBillingDate(e.target.value)}
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+              className="w-full min-w-0 appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
             />
           </div>
 

@@ -183,6 +183,7 @@ export default function Balance() {
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [actionType, setActionType] = useState<ActionType>("DEPOSIT");
   const [actionAmount, setActionAmount] = useState("");
+  const [targetAmount, setTargetAmount] = useState("");
   const [actionDate, setActionDate] = useState("");
   const [actionDescription, setActionDescription] = useState("");
   const [fromAccountId, setFromAccountId] = useState<number | "">("");
@@ -222,8 +223,24 @@ export default function Balance() {
     settings?.secondCurrency && settings.secondCurrency !== mainCurrency
       ? settings.secondCurrency
       : mainCurrency === "ALL"
-      ? "EUR"
-      : "ALL";
+        ? "EUR"
+        : "ALL";
+
+  const selectedFromAccount =
+    typeof fromAccountId === "number"
+      ? accounts.find((account) => account.id === fromAccountId) || null
+      : null;
+
+  const selectedToAccount =
+    typeof toAccountId === "number"
+      ? accounts.find((account) => account.id === toAccountId) || null
+      : null;
+
+  const isCrossCurrencyTransfer =
+    actionType === "TRANSFER" &&
+    !!selectedFromAccount &&
+    !!selectedToAccount &&
+    selectedFromAccount.baseCurrency !== selectedToAccount.baseCurrency;
 
   const totalBalanceMain = useMemo(() => {
     if (!rates) return 0;
@@ -315,7 +332,7 @@ export default function Balance() {
     try {
       setEditSubmitting(true);
 
-      await api.put(`/accounts/${editingAccount.id}`, {
+      await api.patch(`/accounts/${editingAccount.id}`, {
         name: editName.trim(),
         type: editType,
         balance: Number(editBalance),
@@ -335,6 +352,7 @@ export default function Balance() {
   const openActionModal = (nextType: ActionType) => {
     setActionType(nextType);
     setActionAmount("");
+    setTargetAmount("");
     setActionDate("");
     setActionDescription("");
     setFromAccountId("");
@@ -346,6 +364,7 @@ export default function Balance() {
   const closeActionModal = () => {
     setActionModalOpen(false);
     setActionAmount("");
+    setTargetAmount("");
     setActionDate("");
     setActionDescription("");
     setFromAccountId("");
@@ -370,6 +389,11 @@ export default function Balance() {
 
       if (fromAccountId === toAccountId) {
         setActionError("Source and destination accounts must be different");
+        return;
+      }
+
+      if (isCrossCurrencyTransfer && !targetAmount) {
+        setActionError("Please enter the received amount for the destination account");
         return;
       }
     } else {
@@ -401,6 +425,9 @@ export default function Balance() {
           fromAccountId,
           toAccountId,
           amount: Number(actionAmount),
+          targetAmount: isCrossCurrencyTransfer
+            ? Number(targetAmount)
+            : Number(actionAmount),
           date: actionDate,
           description: actionDescription || undefined,
         });
@@ -776,13 +803,12 @@ export default function Balance() {
             <div className="mb-6 flex items-center justify-between gap-4">
               <div className="flex items-start gap-3">
                 <div
-                  className={`rounded-2xl p-2.5 ${
-                    actionType === "DEPOSIT"
-                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                      : actionType === "WITHDRAWAL"
+                  className={`rounded-2xl p-2.5 ${actionType === "DEPOSIT"
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                    : actionType === "WITHDRAWAL"
                       ? "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
                       : "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
-                  }`}
+                    }`}
                 >
                   {actionType === "DEPOSIT" ? (
                     <ArrowDownLeft className="h-5 w-5" />
@@ -797,15 +823,15 @@ export default function Balance() {
                     {actionType === "DEPOSIT"
                       ? "Deposit Money"
                       : actionType === "WITHDRAWAL"
-                      ? "Withdraw Money"
-                      : "Transfer Money"}
+                        ? "Withdraw Money"
+                        : "Transfer Money"}
                   </h2>
                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                     {actionType === "DEPOSIT"
                       ? "Add funds to one of your accounts."
                       : actionType === "WITHDRAWAL"
-                      ? "Remove funds from one of your accounts."
-                      : "Move funds between two accounts."}
+                        ? "Remove funds from one of your accounts."
+                        : "Move funds between two accounts."}
                   </p>
                 </div>
               </div>
@@ -832,7 +858,7 @@ export default function Balance() {
             >
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Amount
+                  {actionType === "TRANSFER" ? "Amount Sent" : "Amount"}
                 </label>
                 <input
                   type="number"
@@ -845,6 +871,23 @@ export default function Balance() {
                 />
               </div>
 
+              {isCrossCurrencyTransfer && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Amount Received
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={targetAmount}
+                    onChange={(e) => setTargetAmount(e.target.value)}
+                    placeholder="9500.00"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
                   Date
@@ -853,7 +896,7 @@ export default function Balance() {
                   type="date"
                   value={actionDate}
                   onChange={(e) => setActionDate(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+                  className="w-full min-w-0 appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
                 />
               </div>
 
@@ -898,6 +941,14 @@ export default function Balance() {
                       ))}
                     </select>
                   </div>
+
+                  {isCrossCurrencyTransfer && selectedFromAccount && selectedToAccount && (
+                    <div className="md:col-span-2 xl:col-span-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                      This transfer is between different currencies:{" "}
+                      {selectedFromAccount.baseCurrency} to {selectedToAccount.baseCurrency}.
+                      Enter the real amount received after exchange.
+                    </div>
+                  )}
                 </>
               ) : (
                 <div>

@@ -21,6 +21,7 @@ type Note = {
     title: string;
     description?: string | null;
     amount?: number | null;
+    currency?: Currency | null;
     personName?: string | null;
     dueDate?: string | null;
     repeatPeriod: RepeatPeriod;
@@ -30,19 +31,13 @@ type Note = {
     updatedAt: string;
 };
 
-type SettingsResponse = {
-    email: string;
-    fullName: string | null;
-    totalsMainCurrency: Currency;
-    showSecondCurrency: boolean;
-    secondCurrency: Currency | null;
-    notifySubscriptionReminder: boolean;
-    notifySubscriptionCreated: boolean;
-    notifySubscriptionCancelled: boolean;
-};
+const fieldClassName =
+    "w-full rounded-2xl border border-slate-200/80 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:bg-slate-950 dark:focus:ring-blue-900/40";
 
 const formatMoney = (amount: number, currency: Currency) => {
-    const symbol = currency === "EUR" ? "€" : currency === "USD" ? "$" : currency === "GBP" ? "£" : "";
+    const symbol =
+        currency === "EUR" ? "€" : currency === "USD" ? "$" : currency === "GBP" ? "£" : "";
+
     return currency === "ALL"
         ? `${amount.toFixed(2)} ALL`
         : `${symbol}${amount.toFixed(2)}`;
@@ -59,7 +54,6 @@ const formatDateForInput = (value?: string | null) => {
 
 export default function Notes() {
     const [notes, setNotes] = useState<Note[]>([]);
-    const [settings, setSettings] = useState<SettingsResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [submitting, setSubmitting] = useState(false);
@@ -67,6 +61,7 @@ export default function Notes() {
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [amount, setAmount] = useState("");
+    const [currency, setCurrency] = useState<Currency>("EUR");
     const [personName, setPersonName] = useState("");
     const [dueDate, setDueDate] = useState("");
     const [type, setType] = useState<NoteType>("GENERAL");
@@ -77,6 +72,7 @@ export default function Notes() {
     const [editTitle, setEditTitle] = useState("");
     const [editDescription, setEditDescription] = useState("");
     const [editAmount, setEditAmount] = useState("");
+    const [editCurrency, setEditCurrency] = useState<Currency>("EUR");
     const [editPersonName, setEditPersonName] = useState("");
     const [editDueDate, setEditDueDate] = useState("");
     const [editType, setEditType] = useState<NoteType>("GENERAL");
@@ -89,20 +85,13 @@ export default function Notes() {
     const [statusFilter, setStatusFilter] = useState("");
     const [typeFilter, setTypeFilter] = useState("");
 
-    const mainCurrency = settings?.totalsMainCurrency || "ALL";
-
     const fetchData = async () => {
         try {
             setLoading(true);
             setError("");
 
-            const [notesRes, settingsRes] = await Promise.all([
-                api.get("/notes"),
-                api.get("/users/me/settings"),
-            ]);
-
+            const notesRes = await api.get("/notes");
             setNotes(notesRes.data.notes || []);
-            setSettings(settingsRes.data || null);
         } catch (err: any) {
             console.error(err);
             setError(err.response?.data?.message || err.response?.data?.error || "Failed to load notes");
@@ -127,6 +116,7 @@ export default function Notes() {
         setTitle("");
         setDescription("");
         setAmount("");
+        setCurrency("EUR");
         setPersonName("");
         setDueDate("");
         setType("GENERAL");
@@ -150,6 +140,7 @@ export default function Notes() {
                 title: title.trim(),
                 description: description.trim() || undefined,
                 amount: amount ? Number(amount) : undefined,
+                currency,
                 personName: personName.trim() || undefined,
                 dueDate: dueDate || undefined,
                 type,
@@ -172,6 +163,7 @@ export default function Notes() {
         setEditTitle(note.title);
         setEditDescription(note.description || "");
         setEditAmount(note.amount != null ? String(note.amount) : "");
+        setEditCurrency(note.currency || "EUR");
         setEditPersonName(note.personName || "");
         setEditDueDate(formatDateForInput(note.dueDate));
         setEditType(note.type);
@@ -185,6 +177,7 @@ export default function Notes() {
         setEditTitle("");
         setEditDescription("");
         setEditAmount("");
+        setEditCurrency("EUR");
         setEditPersonName("");
         setEditDueDate("");
         setEditType("GENERAL");
@@ -211,6 +204,7 @@ export default function Notes() {
                 title: editTitle.trim(),
                 description: editDescription.trim() || undefined,
                 amount: editAmount ? Number(editAmount) : undefined,
+                currency: editCurrency,
                 personName: editPersonName.trim() || undefined,
                 dueDate: editDueDate || undefined,
                 type: editType,
@@ -233,6 +227,7 @@ export default function Notes() {
             setDeletingId(id);
             await api.delete(`/notes/${id}`);
             setNotes((prev) => prev.filter((note) => note.id !== id));
+
             if (editingNote?.id === id) {
                 closeEditModal();
             }
@@ -284,7 +279,7 @@ export default function Notes() {
                 </p>
             </div>
 
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
+            <section className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
                 <div className="mb-6 flex items-start gap-3">
                     <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
                         <Plus className="h-5 w-5" />
@@ -305,130 +300,168 @@ export default function Notes() {
                     </div>
                 )}
 
-                <form onSubmit={handleCreate} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                            Title
-                        </label>
-                        <input
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            placeholder="Pay internet bill"
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                        />
+                <form onSubmit={handleCreate} className="space-y-6">
+                    <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                        <div className="xl:col-span-3">
+                            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                Title
+                            </label>
+                            <input
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                placeholder="Pay internet bill"
+                                className={fieldClassName}
+                            />
+                        </div>
                     </div>
 
-                    <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                            Type
-                        </label>
-                        <select
-                            value={type}
-                            onChange={(e) => setType(e.target.value as NoteType)}
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+                    <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-950/30">
+                        <div className="mb-4">
+                            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                Main details
+                            </h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            <div>
+                                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    Type
+                                </label>
+                                <select
+                                    value={type}
+                                    onChange={(e) => setType(e.target.value as NoteType)}
+                                    className={fieldClassName}
+                                >
+                                    <option value="GENERAL">General</option>
+                                    <option value="TO_RECEIVE">To Receive</option>
+                                    <option value="TO_PAY">To Pay</option>
+                                    <option value="REMINDER">Reminder</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    Status
+                                </label>
+                                <select
+                                    value={status}
+                                    onChange={(e) => setStatus(e.target.value as NoteStatus)}
+                                    className={fieldClassName}
+                                >
+                                    <option value="OPEN">Open</option>
+                                    <option value="DONE">Done</option>
+                                    <option value="CANCELLED">Cancelled</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    Repeat
+                                </label>
+                                <select
+                                    value={repeatPeriod}
+                                    onChange={(e) => setRepeatPeriod(e.target.value as RepeatPeriod)}
+                                    className={fieldClassName}
+                                >
+                                    <option value="NONE">Does not repeat</option>
+                                    <option value="MONTHLY">Monthly</option>
+                                    <option value="YEARLY">Yearly</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    Due Date
+                                </label>
+                                <input
+                                    type="date"
+                                    value={dueDate}
+                                    onChange={(e) => setDueDate(e.target.value)}
+                                    className={fieldClassName}
+                                />
+                            </div>
+
+                            <div className="md:col-span-2 xl:col-span-2">
+                                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    Description
+                                </label>
+                                <textarea
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    placeholder="Extra details..."
+                                    rows={4}
+                                    className={fieldClassName}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-950/30">
+                        <div className="mb-4">
+                            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                Money details
+                            </h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            <div>
+                                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    Amount
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={amount}
+                                    onChange={(e) => setAmount(e.target.value)}
+                                    placeholder="150.00"
+                                    className={fieldClassName}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    Currency
+                                </label>
+                                <select
+                                    value={currency}
+                                    onChange={(e) => setCurrency(e.target.value as Currency)}
+                                    className={fieldClassName}
+                                >
+                                    <option value="ALL">ALL</option>
+                                    <option value="EUR">EUR</option>
+                                    <option value="GBP">GBP</option>
+                                    <option value="USD">USD</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    Person
+                                </label>
+                                <input
+                                    value={personName}
+                                    onChange={(e) => setPersonName(e.target.value)}
+                                    placeholder="John / Landlord / Friend"
+                                    className={fieldClassName}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="border-t border-slate-200/70 pt-4 dark:border-slate-800">
+                        <button
+                            type="submit"
+                            disabled={submitting}
+                            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300 dark:disabled:bg-blue-900/40"
                         >
-                            <option value="GENERAL">General</option>
-                            <option value="TO_RECEIVE">To Receive</option>
-                            <option value="TO_PAY">To Pay</option>
-                            <option value="REMINDER">Reminder</option>
-                        </select>
+                            <Plus className="h-4 w-4" />
+                            {submitting ? "Adding..." : "Add note"}
+                        </button>
                     </div>
-
-                    <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                            Status
-                        </label>
-                        <select
-                            value={status}
-                            onChange={(e) => setStatus(e.target.value as NoteStatus)}
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                        >
-                            <option value="OPEN">Open</option>
-                            <option value="DONE">Done</option>
-                            <option value="CANCELLED">Cancelled</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                            Amount
-                        </label>
-                        <input
-                            type="number"
-                            step="0.01"
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                            placeholder="150.00"
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                            Person
-                        </label>
-                        <input
-                            value={personName}
-                            onChange={(e) => setPersonName(e.target.value)}
-                            placeholder="John / Landlord / Friend"
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                            Due Date
-                        </label>
-                        <input
-                            type="date"
-                            value={dueDate}
-                            onChange={(e) => setDueDate(e.target.value)}
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                        />
-                    </div>
-
-                    <div className="md:col-span-2 xl:col-span-2">
-                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                            Description
-                        </label>
-                        <textarea
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            placeholder="Extra details..."
-                            rows={4}
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                            Repeat
-                        </label>
-                        <select
-                            value={repeatPeriod}
-                            onChange={(e) => setRepeatPeriod(e.target.value as RepeatPeriod)}
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                        >
-                            <option value="NONE">Does not repeat</option>
-                            <option value="MONTHLY">Monthly</option>
-                            <option value="YEARLY">Yearly</option>
-                        </select>
-                    </div>
-
-<div className="md:col-span-2 xl:col-span-3 flex items-end justify-start">
-  <button
-    type="submit"
-    disabled={submitting}
-    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300 dark:disabled:bg-blue-900/40"
-  >
-    <Plus className="h-4 w-4" />
-    {submitting ? "Adding..." : "Add note"}
-  </button>
-</div>
                 </form>
             </section>
 
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
+            <section className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
                 <div className="mb-6 flex items-start gap-3">
                     <div className="rounded-2xl bg-indigo-100 p-2.5 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
                         <Clock3 className="h-5 w-5" />
@@ -451,7 +484,7 @@ export default function Notes() {
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+                            className={fieldClassName}
                         >
                             <option value="">All statuses</option>
                             <option value="OPEN">Open</option>
@@ -467,7 +500,7 @@ export default function Notes() {
                         <select
                             value={typeFilter}
                             onChange={(e) => setTypeFilter(e.target.value)}
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+                            className={fieldClassName}
                         >
                             <option value="">All types</option>
                             <option value="GENERAL">General</option>
@@ -497,10 +530,18 @@ export default function Notes() {
                                             {note.title}
                                         </h3>
                                         <div className="mt-3 flex flex-wrap gap-2">
-                                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getTypeBadgeClasses(note.type)}`}>
+                                            <span
+                                                className={`rounded-full px-3 py-1 text-xs font-semibold ${getTypeBadgeClasses(
+                                                    note.type
+                                                )}`}
+                                            >
                                                 {note.type.replaceAll("_", " ")}
                                             </span>
-                                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClasses(note.status)}`}>
+                                            <span
+                                                className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClasses(
+                                                    note.status
+                                                )}`}
+                                            >
                                                 {note.status}
                                             </span>
                                             {note.repeatPeriod !== "NONE" && (
@@ -539,7 +580,9 @@ export default function Notes() {
                                         <div>
                                             <p className="text-slate-500 dark:text-slate-400">Amount</p>
                                             <p className="font-semibold text-slate-900 dark:text-slate-100">
-                                                {note.amount != null ? formatMoney(note.amount, mainCurrency) : "—"}
+                                                {note.amount != null
+                                                    ? formatMoney(note.amount, note.currency || "EUR")
+                                                    : "—"}
                                             </p>
                                         </div>
 
@@ -573,7 +616,7 @@ export default function Notes() {
 
             {editingNote && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-                    <div className="w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900 sm:p-8">
+                    <div className="w-full max-w-4xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900 sm:p-8">
                         <div className="mb-6 flex items-center justify-between gap-4">
                             <div className="flex items-start gap-3">
                                 <div className="rounded-2xl bg-amber-100 p-2.5 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
@@ -605,116 +648,154 @@ export default function Notes() {
                             </div>
                         )}
 
-                        <form onSubmit={handleEditSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                            <div>
-                                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                    Title
-                                </label>
-                                <input
-                                    value={editTitle}
-                                    onChange={(e) => setEditTitle(e.target.value)}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                    Type
-                                </label>
-                                <select
-                                    value={editType}
-                                    onChange={(e) => setEditType(e.target.value as NoteType)}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                                >
-                                    <option value="GENERAL">General</option>
-                                    <option value="TO_RECEIVE">To Receive</option>
-                                    <option value="TO_PAY">To Pay</option>
-                                    <option value="REMINDER">Reminder</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                    Status
-                                </label>
-                                <select
-                                    value={editStatus}
-                                    onChange={(e) => setEditStatus(e.target.value as NoteStatus)}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                                >
-                                    <option value="OPEN">Open</option>
-                                    <option value="DONE">Done</option>
-                                    <option value="CANCELLED">Cancelled</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                    Amount
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={editAmount}
-                                    onChange={(e) => setEditAmount(e.target.value)}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                    Person
-                                </label>
-                                <input
-                                    value={editPersonName}
-                                    onChange={(e) => setEditPersonName(e.target.value)}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                    Due Date
-                                </label>
-                                <div className="relative">
-                                    <Calendar className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                        <form onSubmit={handleEditSubmit} className="space-y-6">
+                            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                                <div className="xl:col-span-3">
+                                    <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                        Title
+                                    </label>
                                     <input
-                                        type="date"
-                                        value={editDueDate}
-                                        onChange={(e) => setEditDueDate(e.target.value)}
-                                        className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+                                        value={editTitle}
+                                        onChange={(e) => setEditTitle(e.target.value)}
+                                        className={fieldClassName}
                                     />
                                 </div>
                             </div>
 
-                            <div className="md:col-span-2 xl:col-span-2">
-                                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                    Description
-                                </label>
-                                <textarea
-                                    value={editDescription}
-                                    onChange={(e) => setEditDescription(e.target.value)}
-                                    rows={4}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                                />
+                            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-950/30">
+                                <div className="mb-4">
+                                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                        Main details
+                                    </h3>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                    <div>
+                                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                            Type
+                                        </label>
+                                        <select
+                                            value={editType}
+                                            onChange={(e) => setEditType(e.target.value as NoteType)}
+                                            className={fieldClassName}
+                                        >
+                                            <option value="GENERAL">General</option>
+                                            <option value="TO_RECEIVE">To Receive</option>
+                                            <option value="TO_PAY">To Pay</option>
+                                            <option value="REMINDER">Reminder</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                            Status
+                                        </label>
+                                        <select
+                                            value={editStatus}
+                                            onChange={(e) => setEditStatus(e.target.value as NoteStatus)}
+                                            className={fieldClassName}
+                                        >
+                                            <option value="OPEN">Open</option>
+                                            <option value="DONE">Done</option>
+                                            <option value="CANCELLED">Cancelled</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                            Repeat
+                                        </label>
+                                        <select
+                                            value={editRepeatPeriod}
+                                            onChange={(e) => setEditRepeatPeriod(e.target.value as RepeatPeriod)}
+                                            className={fieldClassName}
+                                        >
+                                            <option value="NONE">Does not repeat</option>
+                                            <option value="MONTHLY">Monthly</option>
+                                            <option value="YEARLY">Yearly</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                            Due Date
+                                        </label>
+                                        <div className="relative w-full min-w-0">
+                                            <Calendar className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                                            <input
+                                                type="date"
+                                                value={editDueDate}
+                                                onChange={(e) => setEditDueDate(e.target.value)}
+                                                className="w-full min-w-0 appearance-none rounded-2xl border border-slate-200/80 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:bg-slate-950 dark:focus:ring-blue-900/40"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="md:col-span-2 xl:col-span-2">
+                                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                            Description
+                                        </label>
+                                        <textarea
+                                            value={editDescription}
+                                            onChange={(e) => setEditDescription(e.target.value)}
+                                            rows={4}
+                                            className={fieldClassName}
+                                        />
+                                    </div>
+                                </div>
                             </div>
 
-                            <div>
-                                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                    Repeat
-                                </label>
-                                <select
-                                    value={editRepeatPeriod}
-                                    onChange={(e) => setEditRepeatPeriod(e.target.value as RepeatPeriod)}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                                >
-                                    <option value="NONE">Does not repeat</option>
-                                    <option value="MONTHLY">Monthly</option>
-                                    <option value="YEARLY">Yearly</option>
-                                </select>
+                            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-950/30">
+                                <div className="mb-4">
+                                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                        Money details
+                                    </h3>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                    <div>
+                                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                            Amount
+                                        </label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={editAmount}
+                                            onChange={(e) => setEditAmount(e.target.value)}
+                                            className={fieldClassName}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                            Currency
+                                        </label>
+                                        <select
+                                            value={editCurrency}
+                                            onChange={(e) => setEditCurrency(e.target.value as Currency)}
+                                            className={fieldClassName}
+                                        >
+                                            <option value="ALL">ALL</option>
+                                            <option value="EUR">EUR</option>
+                                            <option value="GBP">GBP</option>
+                                            <option value="USD">USD</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                            Person
+                                        </label>
+                                        <input
+                                            value={editPersonName}
+                                            onChange={(e) => setEditPersonName(e.target.value)}
+                                            className={fieldClassName}
+                                        />
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="md:col-span-2 xl:col-span-3 flex items-end gap-3">
+                            <div className="flex items-end gap-3 border-t border-slate-200/70 pt-4 dark:border-slate-800">
                                 <button
                                     type="button"
                                     onClick={closeEditModal}
