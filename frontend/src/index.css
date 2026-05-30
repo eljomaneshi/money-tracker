@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 html,
 body,
 #root {
@@ -13,9 +19,18 @@ body {
   color: #0f172a;
 }
 
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+
 input[type="date"] {
+  display: block;
   width: 100%;
   min-width: 0;
-  -webkit-appearance: auto;
+  max-width: 100%;
+  box-sizing: border-box;
   appearance: auto;
+  -webkit-appearance: none;
 }

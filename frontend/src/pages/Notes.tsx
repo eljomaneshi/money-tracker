@@ -367,7 +367,7 @@ export default function Notes() {
                                     <option value="YEARLY">Yearly</option>
                                 </select>
                             </div>
-                            <div className="min-w-0">
+                            <div className="min-w-0 overflow-hidden">
                                 <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
                                     Due Date
                                 </label>
@@ -375,8 +375,7 @@ export default function Notes() {
                                     type="date"
                                     value={dueDate}
                                     onChange={(e) => setDueDate(e.target.value)}
-                                    className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                                />
+                                    className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40" />
                             </div>
 
                             <div className="md:col-span-2 xl:col-span-2">
@@ -714,7 +713,7 @@ export default function Notes() {
                                         </select>
                                     </div>
 
-                                    <div className="min-w-0">
+                                    <div className="min-w-0 overflow-hidden">
                                         <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
                                             Due Date
                                         </label>
@@ -722,8 +721,7 @@ export default function Notes() {
                                             type="date"
                                             value={editDueDate}
                                             onChange={(e) => setEditDueDate(e.target.value)}
-                                            className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                                        />
+                                            className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40" />
                                     </div>
 
                                     <div className="md:col-span-2 xl:col-span-2">
