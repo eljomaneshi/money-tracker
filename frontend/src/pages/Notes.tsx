@@ -32,7 +32,7 @@ type Note = {
 };
 
 const fieldClassName =
-    "w-full rounded-2xl border border-slate-200/80 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:bg-slate-950 dark:focus:ring-blue-900/40";
+    "w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40";
 
 const formatMoney = (amount: number, currency: Currency) => {
     const symbol =
@@ -404,7 +404,7 @@ export default function Notes() {
                         </div>
 
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                            <div>
+                            <div className="min-w-0">
                                 <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
                                     Amount
                                 </label>
@@ -418,7 +418,7 @@ export default function Notes() {
                                 />
                             </div>
 
-                            <div>
+                            <div className="min-w-0">
                                 <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
                                     Currency
                                 </label>
@@ -434,7 +434,7 @@ export default function Notes() {
                                 </select>
                             </div>
 
-                            <div>
+                            <div className="min-w-0">
                                 <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
                                     Person
                                 </label>
