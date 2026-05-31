@@ -201,7 +201,7 @@ export default function Subscriptions() {
 
   const handleCancelSubscription = async (id: number) => {
     try {
-      await api.put(`/subscriptions/${id}/cancel`);
+      await api.patch(`/subscriptions/${id}/cancel`);
       await fetchData();
     } catch (err: any) {
       console.error(err);
