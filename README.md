@@ -67,9 +67,62 @@ money-tracker/
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── vite.config.ts
+├── screenshots/
+│   ├── register.png
+│   ├── login.png
+│   ├── dashboard-light.png
+│   ├── dashboard-dark.png
+│   ├── balances.png
+│   ├── subscriptions.png
+│   ├── activity.png
+│   ├── notes.png
+│   ├── settings-account.png
+│   └── settings-preferences.png
 ├── README.md
 └── LICENSE
 ```
+
+## Screenshots
+
+Here are some screens from the current version of the application.
+
+### Authentication
+
+**Register**
+![Register page](./screenshots/register.png)
+
+**Login**
+![Login page](./screenshots/login.png)
+
+### Dashboard
+
+**Dark mode**
+![Dashboard dark mode](./screenshots/dashboard-dark.png)
+
+**Light mode**
+![Dashboard light mode](./screenshots/dashboard-light.png)
+
+### Main Features
+
+**Balances**
+![Balances page](./screenshots/balances.png)
+
+**Subscriptions**
+![Subscriptions page](./screenshots/subscriptions.png)
+
+**Activity**
+![Activity page](./screenshots/activity.png)
+
+**Notes**
+![Notes page](./screenshots/notes.png)
+
+### Settings
+
+**Account management**
+![Settings account section](./screenshots/settings-account.png)
+
+**Preferences and notifications**
+![Settings preferences and notifications](./screenshots/settings-preferences.png)
 
 ## Setup
 
