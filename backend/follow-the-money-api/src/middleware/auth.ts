@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from "express";
+import {NextFunction, Request, Response} from "express";
 import jwt from "jsonwebtoken";
-import { JWT_SECRET } from "../config";
+import {JWT_SECRET} from "../config";
 
 export interface AuthRequest extends Request {
   user?: {
@@ -21,8 +21,7 @@ export function requireAuth(
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: number };
-    req.user = decoded;
+    req.user = jwt.verify(token, JWT_SECRET) as { userId: number };
     next();
   } catch {
     return res.status(401).json({ error: "Invalid token" });

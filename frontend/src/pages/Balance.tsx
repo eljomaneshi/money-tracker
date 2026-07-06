@@ -3,10 +3,16 @@ import {
   ArrowDownLeft,
   ArrowLeftRight,
   ArrowUpRight,
+  ChevronDown,
+  ChevronUp,
+  LayoutGrid,
+  LayoutList,
+  List,
   Landmark,
   Pencil,
   Plus,
   Save,
+  Trash2,
   Wallet,
   X,
 } from "lucide-react";
@@ -16,6 +22,7 @@ import { formatMoney } from "../utils/formatMoney";
 type Currency = "ALL" | "EUR" | "GBP" | "USD";
 type AccountType = "BANK" | "CASH" | "CRYPTO" | "OTHER";
 type ActionType = "DEPOSIT" | "WITHDRAWAL" | "TRANSFER";
+type ViewMode = "comfortable" | "compact" | "list";
 
 type Account = {
   id: number;
@@ -23,6 +30,7 @@ type Account = {
   type: AccountType;
   balance: number;
   baseCurrency: Currency;
+  sortOrder: number;
 };
 
 type ExchangeRates = {
@@ -75,6 +83,10 @@ function AccountCard({
   showSecondCurrency,
   rates,
   onEdit,
+  onMoveUp,
+  onMoveDown,
+  isFirst,
+  isLast,
 }: {
   account: Account;
   mainCurrency: Currency;
@@ -82,6 +94,10 @@ function AccountCard({
   showSecondCurrency: boolean;
   rates: ExchangeRates | null;
   onEdit: (account: Account) => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  isFirst: boolean;
+  isLast: boolean;
 }) {
   const convertedMain = rates
     ? convertAmount(account.balance, account.baseCurrency, mainCurrency, rates)
@@ -111,14 +127,34 @@ function AccountCard({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => onEdit(account)}
-          className="inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-600"
-        >
-          <Pencil className="h-4 w-4" />
-          Edit
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-0.5">
+            <button
+              type="button"
+              onClick={onMoveUp}
+              disabled={isFirst}
+              className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-25 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            >
+              <ChevronUp className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={onMoveDown}
+              disabled={isLast}
+              className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-25 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => onEdit(account)}
+            className="inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-600"
+          >
+            <Pencil className="h-4 w-4" />
+            Edit
+          </button>
+        </div>
       </div>
 
       <div className="mt-6">
@@ -158,6 +194,95 @@ function AccountCard({
   );
 }
 
+function CompactCard({
+  account,
+  mainCurrency,
+  rates,
+  onEdit,
+  onMoveUp,
+  onMoveDown,
+  isFirst,
+  isLast,
+}: {
+  account: Account;
+  mainCurrency: Currency;
+  rates: ExchangeRates | null;
+  onEdit: (account: Account) => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  isFirst: boolean;
+  isLast: boolean;
+}) {
+  const convertedMain = rates
+    ? convertAmount(account.balance, account.baseCurrency, mainCurrency, rates)
+    : 0;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex items-start justify-between gap-2">
+        <div className="rounded-xl bg-blue-100 p-2 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+          <Wallet className="h-4 w-4" />
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="flex flex-col">
+            <button
+              type="button"
+              onClick={onMoveUp}
+              disabled={isFirst}
+              className="rounded p-0.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-25 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            >
+              <ChevronUp className="h-3 w-3" />
+            </button>
+            <button
+              type="button"
+              onClick={onMoveDown}
+              disabled={isLast}
+              className="rounded p-0.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-25 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            >
+              <ChevronDown className="h-3 w-3" />
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => onEdit(account)}
+            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-amber-600 dark:hover:bg-slate-800"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-3">
+        <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">
+          {account.name}
+        </p>
+        <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+          {account.type}
+        </p>
+      </div>
+
+      <div className="mt-3">
+        <p className="text-lg font-extrabold text-slate-900 dark:text-slate-100">
+          {formatMoney(
+            account.balance,
+            account.baseCurrency,
+            account.baseCurrency === "ALL" ? "after" : "before"
+          )}
+        </p>
+        {rates && account.baseCurrency !== mainCurrency && (
+          <p className="mt-0.5 text-sm font-semibold text-blue-700 dark:text-blue-400">
+            {formatMoney(
+              convertedMain,
+              mainCurrency,
+              mainCurrency === "ALL" ? "after" : "before"
+            )}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Balance() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [rates, setRates] = useState<ExchangeRates | null>(null);
@@ -179,6 +304,12 @@ export default function Balance() {
   const [editBaseCurrency, setEditBaseCurrency] = useState<Currency>("EUR");
   const [editError, setEditError] = useState("");
   const [editSubmitting, setEditSubmitting] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    return (localStorage.getItem("balance_view_mode") as ViewMode) || "comfortable";
+  });
 
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [actionType, setActionType] = useState<ActionType>("DEPOSIT");
@@ -244,25 +375,38 @@ export default function Balance() {
 
   const totalBalanceMain = useMemo(() => {
     if (!rates) return 0;
-
     return accounts.reduce((sum, account) => {
-      return (
-        sum +
-        convertAmount(account.balance, account.baseCurrency, mainCurrency, rates)
-      );
+      return sum + convertAmount(account.balance, account.baseCurrency, mainCurrency, rates);
     }, 0);
   }, [accounts, rates, mainCurrency]);
 
   const totalBalanceSecond = useMemo(() => {
     if (!rates || !showSecondCurrency) return 0;
-
     return accounts.reduce((sum, account) => {
-      return (
-        sum +
-        convertAmount(account.balance, account.baseCurrency, secondCurrency, rates)
-      );
+      return sum + convertAmount(account.balance, account.baseCurrency, secondCurrency, rates);
     }, 0);
   }, [accounts, rates, secondCurrency, showSecondCurrency]);
+
+  const changeViewMode = (mode: ViewMode) => {
+    setViewMode(mode);
+    localStorage.setItem("balance_view_mode", mode);
+  };
+
+const moveAccount = (index: number, direction: "up" | "down") => {
+  const newAccounts = [...accounts];
+  const targetIndex = direction === "up" ? index - 1 : index + 1;
+  if (targetIndex < 0 || targetIndex >= newAccounts.length) return;
+  
+  [newAccounts[index], newAccounts[targetIndex]] = [newAccounts[targetIndex], newAccounts[index]];
+  setAccounts(newAccounts);
+  
+  api
+    .patch("/accounts/reorder", { orderedIds: newAccounts.map((a) => a.id) })
+    .catch((err) => {
+      console.error("Reorder failed:", err.response?.data || err); // Added error logging
+      fetchData(); // Revert UI on failure
+    });
+};
 
   const resetCreateForm = () => {
     setName("");
@@ -282,14 +426,12 @@ export default function Balance() {
 
     try {
       setSubmitting(true);
-
       await api.post("/accounts", {
         name: name.trim(),
         type,
         balance: Number(balance),
         baseCurrency,
       });
-
       resetCreateForm();
       await fetchData();
     } catch (err: any) {
@@ -307,6 +449,7 @@ export default function Balance() {
     setEditBalance(String(account.balance));
     setEditBaseCurrency(account.baseCurrency);
     setEditError("");
+    setDeleteConfirm(false);
   };
 
   const closeEditModal = () => {
@@ -316,6 +459,7 @@ export default function Balance() {
     setEditBalance("");
     setEditBaseCurrency("EUR");
     setEditError("");
+    setDeleteConfirm(false);
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -331,14 +475,12 @@ export default function Balance() {
 
     try {
       setEditSubmitting(true);
-
       await api.patch(`/accounts/${editingAccount.id}`, {
         name: editName.trim(),
         type: editType,
         balance: Number(editBalance),
         baseCurrency: editBaseCurrency,
       });
-
       closeEditModal();
       await fetchData();
     } catch (err: any) {
@@ -346,6 +488,23 @@ export default function Balance() {
       setEditError(err.response?.data?.error || "Failed to update account");
     } finally {
       setEditSubmitting(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!editingAccount) return;
+    setEditError("");
+    try {
+      setDeleteSubmitting(true);
+      await api.delete(`/accounts/${editingAccount.id}`);
+      closeEditModal();
+      await fetchData();
+    } catch (err: any) {
+      console.error(err);
+      setEditError(err.response?.data?.message || "Failed to delete account");
+      setDeleteConfirm(false);
+    } finally {
+      setDeleteSubmitting(false);
     }
   };
 
@@ -386,12 +545,10 @@ export default function Balance() {
         setActionError("Please select both source and destination accounts");
         return;
       }
-
       if (fromAccountId === toAccountId) {
         setActionError("Source and destination accounts must be different");
         return;
       }
-
       if (isCrossCurrencyTransfer && !targetAmount) {
         setActionError("Please enter the received amount for the destination account");
         return;
@@ -425,9 +582,7 @@ export default function Balance() {
           fromAccountId,
           toAccountId,
           amount: Number(actionAmount),
-          targetAmount: isCrossCurrencyTransfer
-            ? Number(targetAmount)
-            : Number(actionAmount),
+          targetAmount: isCrossCurrencyTransfer ? Number(targetAmount) : Number(actionAmount),
           date: actionDate,
           description: actionDescription || undefined,
         });
@@ -454,7 +609,6 @@ export default function Balance() {
             Balances
           </h1>
         </div>
-
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 sm:text-base">
           Manage your accounts, balances, deposits, withdrawals, and transfers.
         </p>
@@ -476,7 +630,6 @@ export default function Balance() {
                 </h2>
               </div>
             </div>
-
             <p className="mt-3 text-sm text-slate-500 dark:text-slate-400 sm:text-base">
               Combined balance across all accounts
             </p>
@@ -495,7 +648,6 @@ export default function Balance() {
                   mainCurrency === "ALL" ? "after" : "before"
                 )}
               </p>
-
               {showSecondCurrency && (
                 <p className="text-xl font-bold text-teal-700 dark:text-teal-400 sm:text-3xl">
                   {formatMoney(
@@ -664,19 +816,174 @@ export default function Balance() {
             No accounts found.
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {accounts.map((account) => (
-              <AccountCard
-                key={account.id}
-                account={account}
-                mainCurrency={mainCurrency}
-                secondCurrency={secondCurrency}
-                showSecondCurrency={showSecondCurrency}
-                rates={rates}
-                onEdit={openEditModal}
-              />
-            ))}
-          </div>
+          <>
+            <div className="mb-4 flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                {accounts.length} account{accounts.length !== 1 ? "s" : ""}
+              </p>
+              <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-800 dark:bg-slate-900">
+                <button
+                  type="button"
+                  onClick={() => changeViewMode("comfortable")}
+                  title="Comfortable"
+                  className={`rounded-lg p-2 transition ${
+                    viewMode === "comfortable"
+                      ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
+                      : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                  }`}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changeViewMode("compact")}
+                  title="Compact"
+                  className={`rounded-lg p-2 transition ${
+                    viewMode === "compact"
+                      ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
+                      : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                  }`}
+                >
+                  <LayoutList className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changeViewMode("list")}
+                  title="List"
+                  className={`rounded-lg p-2 transition ${
+                    viewMode === "list"
+                      ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
+                      : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                  }`}
+                >
+                  <List className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {viewMode === "comfortable" && (
+              <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-3">
+                {accounts.map((account, i) => (
+                  <AccountCard
+                    key={account.id}
+                    account={account}
+                    mainCurrency={mainCurrency}
+                    secondCurrency={secondCurrency}
+                    showSecondCurrency={showSecondCurrency}
+                    rates={rates}
+                    onEdit={openEditModal}
+                    onMoveUp={() => moveAccount(i, "up")}
+                    onMoveDown={() => moveAccount(i, "down")}
+                    isFirst={i === 0}
+                    isLast={i === accounts.length - 1}
+                  />
+                ))}
+              </div>
+            )}
+
+            {viewMode === "compact" && (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {accounts.map((account, i) => (
+                  <CompactCard
+                    key={account.id}
+                    account={account}
+                    mainCurrency={mainCurrency}
+                    rates={rates}
+                    onEdit={openEditModal}
+                    onMoveUp={() => moveAccount(i, "up")}
+                    onMoveDown={() => moveAccount(i, "down")}
+                    isFirst={i === 0}
+                    isLast={i === accounts.length - 1}
+                  />
+                ))}
+              </div>
+            )}
+
+            {viewMode === "list" && (
+              <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800">
+                      <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Account
+                      </th>
+                      <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Type
+                      </th>
+                      <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Balance
+                      </th>
+                      <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Converted
+                      </th>
+                      <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {accounts.map((account, i) => (
+                      <tr
+                        key={account.id}
+                        className="border-b border-slate-100 last:border-0 dark:border-slate-800/60"
+                      >
+                        <td className="px-5 py-4 font-semibold text-slate-900 dark:text-slate-100">
+                          {account.name}
+                        </td>
+                        <td className="px-5 py-4 text-sm uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          {account.type}
+                        </td>
+                        <td className="px-5 py-4 text-right font-bold text-slate-900 dark:text-slate-100">
+                          {formatMoney(
+                            account.balance,
+                            account.baseCurrency,
+                            account.baseCurrency === "ALL" ? "after" : "before"
+                          )}
+                        </td>
+                        <td className="px-5 py-4 text-right font-semibold text-blue-700 dark:text-blue-400">
+                          {rates && account.baseCurrency !== mainCurrency
+                            ? formatMoney(
+                                convertAmount(account.balance, account.baseCurrency, mainCurrency, rates),
+                                mainCurrency,
+                                mainCurrency === "ALL" ? "after" : "before"
+                              )
+                            : "—"}
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => moveAccount(i, "up")}
+                              disabled={i === 0}
+                              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-25 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                            >
+                              <ChevronUp className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveAccount(i, "down")}
+                              disabled={i === accounts.length - 1}
+                              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-25 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                            >
+                              <ChevronDown className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(account)}
+                              className="ml-1 inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-600"
+                            >
+                              <Pencil className="h-3 w-3" />
+                              Edit
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </section>
 
@@ -774,23 +1081,65 @@ export default function Balance() {
                 </select>
               </div>
 
-              <div className="flex items-end gap-3 md:col-span-2 xl:col-span-2">
-                <button
-                  type="button"
-                  onClick={closeEditModal}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                >
-                  <X className="h-4 w-4" />
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={editSubmitting}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300 dark:disabled:bg-blue-900/40"
-                >
-                  <Save className="h-4 w-4" />
-                  {editSubmitting ? "Saving..." : "Save changes"}
-                </button>
+              <div className="flex items-end justify-between gap-3 md:col-span-2 xl:col-span-3">
+                <div>
+                  {!deleteConfirm ? (
+                    <button
+                      type="button"
+                      disabled={Number(editingAccount.balance) !== 0 || deleteSubmitting}
+                      onClick={() => setDeleteConfirm(true)}
+                      title={
+                        Number(editingAccount.balance) !== 0
+                          ? `Balance must be 0 to delete (current: ${editingAccount.balance} ${editingAccount.baseCurrency})`
+                          : "Delete this account"
+                      }
+                      className="inline-flex items-center gap-2 rounded-2xl border border-red-200 px-4 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/30 dark:disabled:border-slate-700 dark:disabled:text-slate-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-slate-500 dark:text-slate-400">
+                        Are you sure?
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleDeleteAccount}
+                        disabled={deleteSubmitting}
+                        className="rounded-2xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
+                      >
+                        {deleteSubmitting ? "Deleting..." : "Yes, delete"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteConfirm(false)}
+                        className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                      >
+                        No
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={closeEditModal}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    <X className="h-4 w-4" />
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editSubmitting}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300 dark:disabled:bg-blue-900/40"
+                  >
+                    <Save className="h-4 w-4" />
+                    {editSubmitting ? "Saving..." : "Save changes"}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -803,12 +1152,13 @@ export default function Balance() {
             <div className="mb-6 flex items-center justify-between gap-4">
               <div className="flex items-start gap-3">
                 <div
-                  className={`rounded-2xl p-2.5 ${actionType === "DEPOSIT"
-                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                    : actionType === "WITHDRAWAL"
-                      ? "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
-                      : "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
-                    }`}
+                  className={`rounded-2xl p-2.5 ${
+                    actionType === "DEPOSIT"
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                      : actionType === "WITHDRAWAL"
+                        ? "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
+                        : "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
+                  }`}
                 >
                   {actionType === "DEPOSIT" ? (
                     <ArrowDownLeft className="h-5 w-5" />
@@ -896,7 +1246,8 @@ export default function Balance() {
                   type="date"
                   value={actionDate}
                   onChange={(e) => setActionDate(e.target.value)}
-                  className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40" />
+                  className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+                />
               </div>
 
               {actionType === "TRANSFER" ? (

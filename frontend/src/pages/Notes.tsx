@@ -36,7 +36,6 @@ const fieldClassName =
 const formatMoney = (amount: number, currency: Currency) => {
     const symbol =
         currency === "EUR" ? "€" : currency === "USD" ? "$" : currency === "GBP" ? "£" : "";
-
     return currency === "ALL"
         ? `${amount.toFixed(2)} ALL`
         : `${symbol}${amount.toFixed(2)}`;
@@ -88,7 +87,6 @@ export default function Notes() {
         try {
             setLoading(true);
             setError("");
-
             const notesRes = await api.get("/notes");
             setNotes(notesRes.data.notes || []);
         } catch (err: any) {
@@ -134,7 +132,6 @@ export default function Notes() {
 
         try {
             setSubmitting(true);
-
             await api.post("/notes", {
                 title: title.trim(),
                 description: description.trim() || undefined,
@@ -146,7 +143,6 @@ export default function Notes() {
                 status,
                 repeatPeriod,
             });
-
             resetCreateForm();
             await fetchData();
         } catch (err: any) {
@@ -198,7 +194,6 @@ export default function Notes() {
 
         try {
             setEditSubmitting(true);
-
             await api.put(`/notes/${editingNote.id}`, {
                 title: editTitle.trim(),
                 description: editDescription.trim() || undefined,
@@ -210,7 +205,6 @@ export default function Notes() {
                 status: editStatus,
                 repeatPeriod: editRepeatPeriod,
             });
-
             closeEditModal();
             await fetchData();
         } catch (err: any) {
@@ -226,7 +220,6 @@ export default function Notes() {
             setDeletingId(id);
             await api.delete(`/notes/${id}`);
             setNotes((prev) => prev.filter((note) => note.id !== id));
-
             if (editingNote?.id === id) {
                 closeEditModal();
             }
@@ -284,9 +277,7 @@ export default function Notes() {
                         <Plus className="h-5 w-5" />
                     </div>
                     <div>
-                        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                            Add Note
-                        </h2>
+                        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Add Note</h2>
                         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                             Save reminders, debts, receivables, and personal finance notes.
                         </p>
@@ -300,18 +291,16 @@ export default function Notes() {
                 )}
 
                 <form onSubmit={handleCreate} className="space-y-6">
-                    <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-                        <div className="xl:col-span-3">
-                            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                Title
-                            </label>
-                            <input
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                placeholder="Pay internet bill"
-                                className={fieldClassName}
-                            />
-                        </div>
+                    <div>
+                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                            Title
+                        </label>
+                        <input
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder="Pay internet bill"
+                            className={fieldClassName}
+                        />
                     </div>
 
                     <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-950/30">
@@ -367,6 +356,7 @@ export default function Notes() {
                                     <option value="YEARLY">Yearly</option>
                                 </select>
                             </div>
+
                             <div className="min-w-0 overflow-hidden">
                                 <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
                                     Due Date
@@ -375,7 +365,8 @@ export default function Notes() {
                                     type="date"
                                     value={dueDate}
                                     onChange={(e) => setDueDate(e.target.value)}
-                                    className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40" />
+                                    className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+                                />
                             </div>
 
                             <div className="md:col-span-2 xl:col-span-2">
@@ -464,9 +455,7 @@ export default function Notes() {
                         <Clock3 className="h-5 w-5" />
                     </div>
                     <div>
-                        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                            Your Notes
-                        </h2>
+                        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Your Notes</h2>
                         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                             Manage reminders and personal finance tasks.
                         </p>
@@ -511,9 +500,7 @@ export default function Notes() {
                 {loading ? (
                     <p className="text-sm text-slate-400 dark:text-slate-500">Loading...</p>
                 ) : filteredNotes.length === 0 ? (
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                        No notes found.
-                    </p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">No notes found.</p>
                 ) : (
                     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                         {filteredNotes.map((note) => (
@@ -527,18 +514,10 @@ export default function Notes() {
                                             {note.title}
                                         </h3>
                                         <div className="mt-3 flex flex-wrap gap-2">
-                                            <span
-                                                className={`rounded-full px-3 py-1 text-xs font-semibold ${getTypeBadgeClasses(
-                                                    note.type
-                                                )}`}
-                                            >
+                                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getTypeBadgeClasses(note.type)}`}>
                                                 {note.type.replaceAll("_", " ")}
                                             </span>
-                                            <span
-                                                className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClasses(
-                                                    note.status
-                                                )}`}
-                                            >
+                                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClasses(note.status)}`}>
                                                 {note.status}
                                             </span>
                                             {note.repeatPeriod !== "NONE" && (
@@ -582,21 +561,18 @@ export default function Notes() {
                                                     : "—"}
                                             </p>
                                         </div>
-
                                         <div>
                                             <p className="text-slate-500 dark:text-slate-400">Person</p>
                                             <p className="font-semibold text-slate-900 dark:text-slate-100">
                                                 {note.personName || "—"}
                                             </p>
                                         </div>
-
                                         <div>
                                             <p className="text-slate-500 dark:text-slate-400">Due date</p>
                                             <p className="font-semibold text-slate-900 dark:text-slate-100">
                                                 {note.dueDate ? new Date(note.dueDate).toLocaleDateString() : "—"}
                                             </p>
                                         </div>
-
                                         <div>
                                             <p className="text-slate-500 dark:text-slate-400">Updated</p>
                                             <p className="font-semibold text-slate-900 dark:text-slate-100">
@@ -612,42 +588,42 @@ export default function Notes() {
             </section>
 
             {editingNote && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-                    <div className="w-full max-w-4xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900 sm:p-8">
-                        <div className="mb-6 flex items-center justify-between gap-4">
-                            <div className="flex items-start gap-3">
-                                <div className="rounded-2xl bg-amber-100 p-2.5 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
-                                    <Pencil className="h-5 w-5" />
+                <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm">
+                    <div className="mx-auto flex min-h-full items-center justify-center">
+                        <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto overscroll-contain rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900 sm:p-8">
+
+                            <div className="mb-6 flex items-center justify-between gap-4">
+                                <div className="flex items-start gap-3">
+                                    <div className="rounded-2xl bg-amber-100 p-2.5 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
+                                        <Pencil className="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 sm:text-2xl">
+                                            Edit Note
+                                        </h2>
+                                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                            Update the note details and status.
+                                        </p>
+                                    </div>
                                 </div>
+                                <button
+                                    type="button"
+                                    onClick={closeEditModal}
+                                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                                >
+                                    <X className="h-4 w-4" />
+                                    Close
+                                </button>
+                            </div>
+
+                            {editError && (
+                                <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+                                    {editError}
+                                </div>
+                            )}
+
+                            <form onSubmit={handleEditSubmit} className="space-y-6">
                                 <div>
-                                    <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 sm:text-2xl">
-                                        Edit Note
-                                    </h2>
-                                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                        Update the note details and status.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={closeEditModal}
-                                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                            >
-                                <X className="h-4 w-4" />
-                                Close
-                            </button>
-                        </div>
-
-                        {editError && (
-                            <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
-                                {editError}
-                            </div>
-                        )}
-
-                        <form onSubmit={handleEditSubmit} className="space-y-6">
-                            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-                                <div className="xl:col-span-3">
                                     <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
                                         Title
                                     </label>
@@ -657,156 +633,158 @@ export default function Notes() {
                                         className={fieldClassName}
                                     />
                                 </div>
-                            </div>
 
-                            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-950/30">
-                                <div className="mb-4">
-                                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                                        Main details
-                                    </h3>
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                                    <div>
-                                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                            Type
-                                        </label>
-                                        <select
-                                            value={editType}
-                                            onChange={(e) => setEditType(e.target.value as NoteType)}
-                                            className={fieldClassName}
-                                        >
-                                            <option value="GENERAL">General</option>
-                                            <option value="TO_RECEIVE">To Receive</option>
-                                            <option value="TO_PAY">To Pay</option>
-                                            <option value="REMINDER">Reminder</option>
-                                        </select>
+                                <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-950/30">
+                                    <div className="mb-4">
+                                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                            Main details
+                                        </h3>
                                     </div>
 
-                                    <div>
-                                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                            Status
-                                        </label>
-                                        <select
-                                            value={editStatus}
-                                            onChange={(e) => setEditStatus(e.target.value as NoteStatus)}
-                                            className={fieldClassName}
-                                        >
-                                            <option value="OPEN">Open</option>
-                                            <option value="DONE">Done</option>
-                                            <option value="CANCELLED">Cancelled</option>
-                                        </select>
-                                    </div>
+                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                        <div>
+                                            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                                Type
+                                            </label>
+                                            <select
+                                                value={editType}
+                                                onChange={(e) => setEditType(e.target.value as NoteType)}
+                                                className={fieldClassName}
+                                            >
+                                                <option value="GENERAL">General</option>
+                                                <option value="TO_RECEIVE">To Receive</option>
+                                                <option value="TO_PAY">To Pay</option>
+                                                <option value="REMINDER">Reminder</option>
+                                            </select>
+                                        </div>
 
-                                    <div>
-                                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                            Repeat
-                                        </label>
-                                        <select
-                                            value={editRepeatPeriod}
-                                            onChange={(e) => setEditRepeatPeriod(e.target.value as RepeatPeriod)}
-                                            className={fieldClassName}
-                                        >
-                                            <option value="NONE">Does not repeat</option>
-                                            <option value="MONTHLY">Monthly</option>
-                                            <option value="YEARLY">Yearly</option>
-                                        </select>
-                                    </div>
+                                        <div>
+                                            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                                Status
+                                            </label>
+                                            <select
+                                                value={editStatus}
+                                                onChange={(e) => setEditStatus(e.target.value as NoteStatus)}
+                                                className={fieldClassName}
+                                            >
+                                                <option value="OPEN">Open</option>
+                                                <option value="DONE">Done</option>
+                                                <option value="CANCELLED">Cancelled</option>
+                                            </select>
+                                        </div>
 
-                                    <div className="min-w-0 overflow-hidden">
-                                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                            Due Date
-                                        </label>
-                                        <input
-                                            type="date"
-                                            value={editDueDate}
-                                            onChange={(e) => setEditDueDate(e.target.value)}
-                                            className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40" />
-                                    </div>
+                                        <div>
+                                            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                                Repeat
+                                            </label>
+                                            <select
+                                                value={editRepeatPeriod}
+                                                onChange={(e) => setEditRepeatPeriod(e.target.value as RepeatPeriod)}
+                                                className={fieldClassName}
+                                            >
+                                                <option value="NONE">Does not repeat</option>
+                                                <option value="MONTHLY">Monthly</option>
+                                                <option value="YEARLY">Yearly</option>
+                                            </select>
+                                        </div>
 
-                                    <div className="md:col-span-2 xl:col-span-2">
-                                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                            Description
-                                        </label>
-                                        <textarea
-                                            value={editDescription}
-                                            onChange={(e) => setEditDescription(e.target.value)}
-                                            rows={4}
-                                            className={fieldClassName}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
+                                        <div className="min-w-0 overflow-hidden">
+                                            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                                Due Date
+                                            </label>
+                                            <input
+                                                type="date"
+                                                value={editDueDate}
+                                                onChange={(e) => setEditDueDate(e.target.value)}
+                                                className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+                                            />
+                                        </div>
 
-                            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-950/30">
-                                <div className="mb-4">
-                                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                                        Money details
-                                    </h3>
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                                    <div>
-                                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                            Amount
-                                        </label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            value={editAmount}
-                                            onChange={(e) => setEditAmount(e.target.value)}
-                                            className={fieldClassName}
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                            Currency
-                                        </label>
-                                        <select
-                                            value={editCurrency}
-                                            onChange={(e) => setEditCurrency(e.target.value as Currency)}
-                                            className={fieldClassName}
-                                        >
-                                            <option value="ALL">ALL</option>
-                                            <option value="EUR">EUR</option>
-                                            <option value="GBP">GBP</option>
-                                            <option value="USD">USD</option>
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                            Person
-                                        </label>
-                                        <input
-                                            value={editPersonName}
-                                            onChange={(e) => setEditPersonName(e.target.value)}
-                                            className={fieldClassName}
-                                        />
+                                        <div className="md:col-span-2 xl:col-span-2">
+                                            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                                Description
+                                            </label>
+                                            <textarea
+                                                value={editDescription}
+                                                onChange={(e) => setEditDescription(e.target.value)}
+                                                rows={4}
+                                                className={fieldClassName}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="flex items-end gap-3 border-t border-slate-200/70 pt-4 dark:border-slate-800">
-                                <button
-                                    type="button"
-                                    onClick={closeEditModal}
-                                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                                >
-                                    <X className="h-4 w-4" />
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={editSubmitting}
-                                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300 dark:disabled:bg-blue-900/40"
-                                >
-                                    <Save className="h-4 w-4" />
-                                    {editSubmitting ? "Saving..." : "Save changes"}
-                                </button>
-                            </div>
-                        </form>
+                                <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-950/30">
+                                    <div className="mb-4">
+                                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                            Money details
+                                        </h3>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                        <div>
+                                            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                                Amount
+                                            </label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={editAmount}
+                                                onChange={(e) => setEditAmount(e.target.value)}
+                                                className={fieldClassName}
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                                Currency
+                                            </label>
+                                            <select
+                                                value={editCurrency}
+                                                onChange={(e) => setEditCurrency(e.target.value as Currency)}
+                                                className={fieldClassName}
+                                            >
+                                                <option value="ALL">ALL</option>
+                                                <option value="EUR">EUR</option>
+                                                <option value="GBP">GBP</option>
+                                                <option value="USD">USD</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                                Person
+                                            </label>
+                                            <input
+                                                value={editPersonName}
+                                                onChange={(e) => setEditPersonName(e.target.value)}
+                                                className={fieldClassName}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-end gap-3 border-t border-slate-200/70 pt-4 dark:border-slate-800">
+                                    <button
+                                        type="button"
+                                        onClick={closeEditModal}
+                                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                                    >
+                                        <X className="h-4 w-4" />
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={editSubmitting}
+                                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300 dark:disabled:bg-blue-900/40"
+                                    >
+                                        <Save className="h-4 w-4" />
+                                        {editSubmitting ? "Saving..." : "Save changes"}
+                                    </button>
+                                </div>
+                            </form>
+
+                        </div>
                     </div>
                 </div>
             )}

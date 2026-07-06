@@ -1,12 +1,18 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import prisma from "../prisma";
 import { AuthRequest } from "../middleware/auth";
+import type { Account } from "@prisma/client";
 
 export async function getExpenses(req: AuthRequest, res: Response) {
     if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
     const expenses = await prisma.expense.findMany({
         where: { userId: req.user.userId },
+        include: {
+            account: {
+                select: { id: true, name: true, baseCurrency: true },
+            },
+        },
         orderBy: { date: "desc" },
     });
 
@@ -43,6 +49,7 @@ export async function createExpense(req: AuthRequest, res: Response) {
             where: {
                 id,
                 userId: req.user.userId,
+                deletedAt: null,
             },
         });
 
@@ -66,7 +73,7 @@ export async function createExpense(req: AuthRequest, res: Response) {
                 },
             });
 
-            let updatedAccount = null;
+            let updatedAccount: Account | null = null;
 
             if (linkedAccountId) {
                 updatedAccount = await tx.account.update({
@@ -208,7 +215,7 @@ export async function updateExpense(req: AuthRequest, res: Response) {
                 }
             }
 
-            const expense = await tx.expense.update({
+            return await tx.expense.update({
                 where: { id },
                 data: {
                     amount: parsedAmount,
@@ -218,8 +225,6 @@ export async function updateExpense(req: AuthRequest, res: Response) {
                     accountId: parsedAccountId,
                 },
             });
-
-            return expense;
         });
 
         return res.json({

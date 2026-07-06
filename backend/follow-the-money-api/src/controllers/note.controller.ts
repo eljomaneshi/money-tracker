@@ -1,23 +1,28 @@
 import { Response } from "express";
 import prisma from "../prisma";
 import { AuthRequest } from "../middleware/auth";
-import { Currency, NoteStatus, NoteType, RepeatPeriod } from "@prisma/client";
+import {
+    Note_currency,
+    Note_repeatPeriod,
+    Note_type,
+    Note_status,
+} from "@prisma/client";
 
-const ALLOWED_CURRENCIES: Currency[] = ["ALL", "EUR", "GBP", "USD"];
-const ALLOWED_REPEAT_PERIODS: RepeatPeriod[] = ["NONE", "MONTHLY", "YEARLY"];
-const ALLOWED_NOTE_TYPES: NoteType[] = ["GENERAL", "TO_RECEIVE", "TO_PAY", "REMINDER"];
-const ALLOWED_NOTE_STATUSES: NoteStatus[] = ["OPEN", "DONE", "CANCELLED"];
+const ALLOWED_CURRENCIES: Note_currency[] = ["ALL", "EUR", "GBP", "USD"];
+const ALLOWED_REPEAT_PERIODS: Note_repeatPeriod[] = ["NONE", "MONTHLY", "YEARLY"];
+const ALLOWED_NOTE_TYPES: Note_type[] = ["GENERAL", "TO_RECEIVE", "TO_PAY", "REMINDER"];
+const ALLOWED_NOTE_STATUSES: Note_status[] = ["OPEN", "DONE", "CANCELLED"];
 
 type NotePayload = {
     title: string;
     description: string | null;
     amount: number | null;
-    currency: Currency;
+    currency: Note_currency;
     personName: string | null;
     dueDate: Date | null;
-    repeatPeriod: RepeatPeriod;
-    type: NoteType;
-    status: NoteStatus;
+    repeatPeriod: Note_repeatPeriod;
+    type: Note_type;
+    status: Note_status;
 };
 
 function parseAmount(amount: unknown): { value?: number | null; error?: string } {
@@ -34,29 +39,29 @@ function parseAmount(amount: unknown): { value?: number | null; error?: string }
     return { value: parsed };
 }
 
-function parseCurrency(value: unknown): Currency {
+function parseCurrency(value: unknown): Note_currency {
     if (typeof value !== "string") return "EUR";
-    return ALLOWED_CURRENCIES.includes(value as Currency) ? (value as Currency) : "EUR";
+    return ALLOWED_CURRENCIES.includes(value as Note_currency) ? (value as Note_currency) : "EUR";
 }
 
-function parseRepeatPeriod(value: unknown): RepeatPeriod {
+function parseRepeatPeriod(value: unknown): Note_repeatPeriod {
     if (typeof value !== "string") return "NONE";
-    return ALLOWED_REPEAT_PERIODS.includes(value as RepeatPeriod)
-        ? (value as RepeatPeriod)
+    return ALLOWED_REPEAT_PERIODS.includes(value as Note_repeatPeriod)
+        ? (value as Note_repeatPeriod)
         : "NONE";
 }
 
-function parseNoteType(value: unknown): NoteType {
+function parseNoteType(value: unknown): Note_type {
     if (typeof value !== "string") return "GENERAL";
-    return ALLOWED_NOTE_TYPES.includes(value as NoteType)
-        ? (value as NoteType)
+    return ALLOWED_NOTE_TYPES.includes(value as Note_type)
+        ? (value as Note_type)
         : "GENERAL";
 }
 
-function parseNoteStatus(value: unknown): NoteStatus {
+function parseNoteStatus(value: unknown): Note_status {
     if (typeof value !== "string") return "OPEN";
-    return ALLOWED_NOTE_STATUSES.includes(value as NoteStatus)
-        ? (value as NoteStatus)
+    return ALLOWED_NOTE_STATUSES.includes(value as Note_status)
+        ? (value as Note_status)
         : "OPEN";
 }
 

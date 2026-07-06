@@ -8,24 +8,120 @@ datasource db {
 }
 
 model User {
-  id                          Int      @id @default(autoincrement())
-  email                       String   @unique
+  id                          Int                  @id @default(autoincrement())
+  email                       String               @unique
   passwordHash                String
+  createdAt                   DateTime             @default(now())
   fullName                    String?
-  totalsMainCurrency          String   @default("ALL")
-  showSecondCurrency          Boolean  @default(true)
-  secondCurrency              String?  @default("EUR")
-  notifySubscriptionReminder  Boolean  @default(true)
-  notifySubscriptionCreated   Boolean  @default(true)
-  notifySubscriptionCancelled Boolean  @default(true)
-  createdAt                   DateTime @default(now())
+  notifySubscriptionCancelled Boolean              @default(true)
+  notifySubscriptionCreated   Boolean              @default(true)
+  notifySubscriptionReminder  Boolean              @default(true)
+  secondCurrency              String?              @default("EUR")
+  showSecondCurrency          Boolean              @default(true)
+  totalsMainCurrency          String               @default("ALL")
+  accounts                    Account[]
+  AccountAction               AccountAction[]
+  expenses                    Expense[]
+  notes                       Note[]
+  PendingEmailChange          PendingEmailChange[]
+  subscriptions               Subscription[]
+}
 
-  subscriptions       Subscription[]
-  expenses            Expense[]
-  accounts            Account[]
-  pendingEmailChanges PendingEmailChange[]
-  accountActions      AccountAction[]
-  notes               Note[]
+model Account {
+  id           Int                  @id @default(autoincrement())
+  userId       Int
+  name         String
+  type         Account_type
+  balance      Float
+  createdAt    DateTime             @default(now())
+  baseCurrency Account_baseCurrency @default(EUR)
+  sortOrder    Int                  @default(0)
+  deletedAt    DateTime?
+
+  user                                             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  AccountAction_AccountAction_accountIdToAccount   AccountAction[] @relation("AccountAction_accountIdToAccount")
+  AccountAction_AccountAction_toAccountIdToAccount AccountAction[] @relation("AccountAction_toAccountIdToAccount")
+  expenses                                         Expense[]
+  subscriptions                                    Subscription[]
+
+  @@index([userId], map: "Account_userId_fkey")
+  @@index([userId, deletedAt])
+}
+
+model Expense {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  amount      Float
+  date        DateTime
+  category    String
+  description String?
+  createdAt   DateTime @default(now())
+  accountId   Int?
+  account     Account? @relation(fields: [accountId], references: [id])
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([accountId], map: "Expense_accountId_fkey")
+  @@index([userId], map: "Expense_userId_fkey")
+}
+
+model Subscription {
+  id                   Int       @id @default(autoincrement())
+  name                 String
+  price                Float
+  billingPeriod        String
+  nextBillingDate      DateTime
+  status               String
+  createdAt            DateTime  @default(now())
+  userId               Int
+  accountId            Int?
+  reminder1DaySentFor  DateTime?
+  reminder3DaysSentFor DateTime?
+  account              Account?  @relation(fields: [accountId], references: [id])
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([accountId], map: "Subscription_accountId_fkey")
+  @@index([userId], map: "Subscription_userId_fkey")
+}
+
+model Note {
+  id           Int               @id @default(autoincrement())
+  userId       Int
+  title        String
+  description  String?           @db.Text
+  amount       Float?
+  personName   String?
+  dueDate      DateTime?
+  repeatPeriod Note_repeatPeriod @default(NONE)
+  type         Note_type         @default(GENERAL)
+  status       Note_status       @default(OPEN)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  currency     Note_currency     @default(EUR)
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, dueDate])
+  @@index([userId, status])
+}
+
+model AccountAction {
+  id           Int                @id @default(autoincrement())
+  userId       Int
+  accountId    Int
+  toAccountId  Int?
+  type         AccountAction_type
+  amount       Float
+  description  String?
+  date         DateTime
+  createdAt    DateTime           @default(now())
+  exchangeRate Float?
+  targetAmount Float?
+  account      Account            @relation("AccountAction_accountIdToAccount", fields: [accountId], references: [id], onDelete: Cascade)
+  toAccount    Account?           @relation("AccountAction_toAccountIdToAccount", fields: [toAccountId], references: [id])
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([toAccountId])
+  @@index([userId, date])
 }
 
 model EmailVerificationCode {
@@ -47,154 +143,55 @@ model PendingEmailChange {
   expiresAt DateTime
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
   @@index([newEmail])
+  @@index([userId])
 }
 
-model Expense {
-  id          Int      @id @default(autoincrement())
-  amount      Float
-  date        DateTime
-  category    String
-  description String?
-  userId      Int
-  accountId   Int?
-  createdAt   DateTime @default(now())
-
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  account Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
-}
-
-enum BillingPeriod {
-  MONTHLY
-  YEARLY
-}
-
-enum SubscriptionStatus {
-  ACTIVE
-  CANCELLED
-}
-
-enum AccountType {
+enum Account_type {
   BANK
   CASH
   CRYPTO
   OTHER
 }
 
-enum Currency {
-  ALL
-  EUR
-  GBP
-  USD
-}
-
-enum AccountActionType {
+enum AccountAction_type {
   DEPOSIT
   WITHDRAWAL
   TRANSFER_OUT
   TRANSFER_IN
 }
 
-enum NoteType {
+enum Account_baseCurrency {
+  ALL
+  EUR
+  GBP
+  USD
+}
+
+enum Note_repeatPeriod {
+  NONE
+  MONTHLY
+  YEARLY
+}
+
+enum Note_type {
   GENERAL
   TO_RECEIVE
   TO_PAY
   REMINDER
 }
 
-enum NoteStatus {
+enum Note_status {
   OPEN
   DONE
   CANCELLED
 }
 
-enum RepeatPeriod {
-  NONE
-  MONTHLY
-  YEARLY
-}
-
-model Subscription {
-  id     Int  @id @default(autoincrement())
-  userId Int
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  name            String
-  price           Float
-  billingPeriod   String
-  nextBillingDate DateTime
-  status          String
-
-  accountId Int?
-  account   Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
-
-  reminder3DaysSentFor DateTime?
-  reminder1DaySentFor  DateTime?
-
-  createdAt DateTime @default(now())
-}
-
-model Account {
-  id     Int  @id @default(autoincrement())
-  userId Int
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  name         String
-  type         AccountType
-  balance      Float
-  baseCurrency Currency    @default(EUR)
-
-  expenses        Expense[]
-  subscriptions   Subscription[]
-  outgoingActions AccountAction[] @relation("ActionFromAccount")
-  incomingActions AccountAction[] @relation("ActionToAccount")
-
-  createdAt DateTime @default(now())
-}
-
-model AccountAction {
-  id           Int               @id @default(autoincrement())
-  userId       Int
-  accountId    Int
-  toAccountId  Int?
-  type         AccountActionType
-  amount       Float
-  targetAmount Float?
-  exchangeRate Float?
-  description  String?
-  date         DateTime
-  createdAt    DateTime          @default(now())
-
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  account   Account  @relation("ActionFromAccount", fields: [accountId], references: [id], onDelete: Cascade)
-  toAccount Account? @relation("ActionToAccount", fields: [toAccountId], references: [id], onDelete: SetNull)
-
-  @@index([userId, date])
-  @@index([accountId])
-  @@index([toAccountId])
-}
-
-model Note {
-  id           Int          @id @default(autoincrement())
-  userId       Int
-  title        String
-  description  String?      @db.Text
-  amount       Float?
-  currency     Currency     @default(EUR)
-  personName   String?
-  dueDate      DateTime?
-  repeatPeriod RepeatPeriod @default(NONE)
-  type         NoteType     @default(GENERAL)
-  status       NoteStatus   @default(OPEN)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, status])
-  @@index([userId, dueDate])
+enum Note_currency {
+  ALL
+  EUR
+  GBP
+  USD
 }

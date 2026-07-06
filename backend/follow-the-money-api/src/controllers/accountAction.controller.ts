@@ -52,6 +52,7 @@ export async function depositToAccount(req: AuthRequest, res: Response) {
                 where: {
                     id: parsedAccountId,
                     userId: req.user!.userId,
+                    deletedAt: null,
                 },
             });
 
@@ -117,6 +118,7 @@ export async function withdrawFromAccount(req: AuthRequest, res: Response) {
                 where: {
                     id: parsedAccountId,
                     userId: req.user!.userId,
+                    deletedAt: null,
                 },
             });
 
@@ -192,6 +194,7 @@ export async function transferBetweenAccounts(req: AuthRequest, res: Response) {
                 where: {
                     id: parsedFromAccountId,
                     userId: req.user!.userId,
+                    deletedAt: null,
                 },
             });
 
@@ -199,6 +202,7 @@ export async function transferBetweenAccounts(req: AuthRequest, res: Response) {
                 where: {
                     id: parsedToAccountId,
                     userId: req.user!.userId,
+                    deletedAt: null,
                 },
             });
 
@@ -212,25 +216,16 @@ export async function transferBetweenAccounts(req: AuthRequest, res: Response) {
 
             const sameCurrency = fromAccount.baseCurrency === toAccount.baseCurrency;
             const safeTargetAmount = sameCurrency ? parsedAmount : parsedTargetAmount;
-            const exchangeRate =
-                sameCurrency ? 1 : parsedTargetAmount / parsedAmount;
+            const exchangeRate = sameCurrency ? 1 : parsedTargetAmount / parsedAmount;
 
             const updatedFromAccount = await tx.account.update({
                 where: { id: fromAccount.id },
-                data: {
-                    balance: {
-                        decrement: parsedAmount,
-                    },
-                },
+                data: { balance: { decrement: parsedAmount } },
             });
 
             const updatedToAccount = await tx.account.update({
                 where: { id: toAccount.id },
-                data: {
-                    balance: {
-                        increment: safeTargetAmount,
-                    },
-                },
+                data: { balance: { increment: safeTargetAmount } },
             });
 
             const transferOut = await tx.accountAction.create({
@@ -261,12 +256,7 @@ export async function transferBetweenAccounts(req: AuthRequest, res: Response) {
                 },
             });
 
-            return {
-                transferOut,
-                transferIn,
-                updatedFromAccount,
-                updatedToAccount,
-            };
+            return { transferOut, transferIn, updatedFromAccount, updatedToAccount };
         });
 
         return res.status(201).json(result);

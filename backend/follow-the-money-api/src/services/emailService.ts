@@ -234,7 +234,7 @@ export async function sendSubscriptionCancelledEmail({
         preheader: `${subscriptionName} has been cancelled successfully.`,
         title: "Subscription Cancelled",
         badge: buildStatusBadge("Cancelled", "#fee2e2", "#991b1b"),
-        intro: `Your subscription <strong>${escapedName}</strong> has been cancelled successfully and is no longer active in your subscription list.`,
+        intro: `Your subscription <strong>${escapedName}</strong> has been canceled successfully and is no longer active in your subscription list.`,
         detailsTable: `
       ${buildInfoRow("Subscription", `<span>${escapedName}</span>`)}
       ${buildInfoRow("Status", `<span>Cancelled</span>`)}
