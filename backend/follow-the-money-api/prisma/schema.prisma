@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -44,7 +45,7 @@ model Account {
   expenses                                         Expense[]
   subscriptions                                    Subscription[]
 
-  @@index([userId], map: "Account_userId_fkey")
+  @@index([userId], map: "Account_userId_idx")
   @@index([userId, deletedAt])
 }
 
@@ -60,8 +61,8 @@ model Expense {
   account     Account? @relation(fields: [accountId], references: [id])
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([accountId], map: "Expense_accountId_fkey")
-  @@index([userId], map: "Expense_userId_fkey")
+  @@index([accountId], map: "Expense_accountId_idx")
+  @@index([userId], map: "Expense_userId_idx")
 }
 
 model Subscription {
@@ -79,8 +80,8 @@ model Subscription {
   account              Account?  @relation(fields: [accountId], references: [id])
   user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([accountId], map: "Subscription_accountId_fkey")
-  @@index([userId], map: "Subscription_userId_fkey")
+  @@index([accountId], map: "Subscription_accountId_idx")
+  @@index([userId], map: "Subscription_userId_idx")
 }
 
 model Note {

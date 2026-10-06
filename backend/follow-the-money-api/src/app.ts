@@ -46,11 +46,13 @@ app.use("/auth", authRoutes);
 app.use("/subscriptions", subscriptionRoutes);
 app.use("/expenses", expenseRoutes);
 app.use("/accounts", accountRoutes);
+app.use("/notes", noteRoutes);
+app.use("/account-actions", accountActionRoutes);
 
 app.get("/health", (_req: Request, res: Response) => {
     res.status(200).json({
         status: "ok",
-        message: "Express + Prisma + MySQL ready",
+        message: "Express + Prisma + PostgreSQL ready",
     });
 });
 
@@ -65,8 +67,5 @@ app.use(
         res.status(500).json({ error: "Internal server error" });
     }
 );
-
-app.use("/notes", noteRoutes);
-app.use("/account-actions", accountActionRoutes);
 
 export default app;

@@ -8,7 +8,11 @@
     "start": "node dist/server.js",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
-    "prisma:migrate:deploy": "prisma migrate deploy"
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "db:validate": "ts-node scripts/validate-postgres-migration.ts",
+    "db:compare": "ts-node scripts/compare-database-counts.ts",
+    "db:migrate-data": "ts-node scripts/migrate-mysql-to-postgres.ts",
+    "test:e2e": "ts-node scripts/test-e2e-api.ts"
   },
   "keywords": [],
   "author": "",
