@@ -1,14 +1,14 @@
 import { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import crypto from "crypto";
+import crypto, { randomInt } from "node:crypto";
 import prisma from "../prisma";
 import { JWT_SECRET, JWT_EXPIRES_IN } from "../config";
 import { sendVerificationCodeEmail } from "../lib/mailer";
 import { AuthRequest } from "../middleware/auth";
 
 function generateVerificationCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return randomInt(100000, 1000000).toString();
 }
 
 function hashVerificationCode(code: string) {
