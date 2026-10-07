@@ -3,6 +3,10 @@ import { Resend } from "resend";
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function sendVerificationCodeEmail(email: string, code: string) {
+    if (process.env.SECURITY_TEST_MODE === "true" || process.env.NODE_ENV === "test") {
+        return;
+    }
+
     console.log("sendVerificationCodeEmail start", {
         to: email,
         apiKeyPresent: Boolean(process.env.RESEND_API_KEY),

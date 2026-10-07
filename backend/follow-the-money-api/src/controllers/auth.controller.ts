@@ -15,6 +15,42 @@ function hashVerificationCode(code: string) {
   return crypto.createHash("sha256").update(code).digest("hex");
 }
 
+interface FailedAttemptRow {
+  id: number;
+  failedAttempts: number;
+  used: boolean;
+}
+
+async function recordFailedRegistrationCodeAttempt(id: number): Promise<FailedAttemptRow | null> {
+  const rows = await prisma.$queryRaw<FailedAttemptRow[]>`
+    UPDATE "EmailVerificationCode"
+    SET
+      "failedAttempts" = "failedAttempts" + 1,
+      "used" = CASE WHEN "failedAttempts" + 1 >= 5 THEN true ELSE false END
+    WHERE "id" = ${id}
+      AND "used" = false
+      AND "expiresAt" > NOW()
+      AND "failedAttempts" < 5
+    RETURNING "id", "failedAttempts", "used"
+  `;
+  return rows[0] ?? null;
+}
+
+async function recordFailedEmailChangeAttempt(id: number): Promise<FailedAttemptRow | null> {
+  const rows = await prisma.$queryRaw<FailedAttemptRow[]>`
+    UPDATE "PendingEmailChange"
+    SET
+      "failedAttempts" = "failedAttempts" + 1,
+      "used" = CASE WHEN "failedAttempts" + 1 >= 5 THEN true ELSE false END
+    WHERE "id" = ${id}
+      AND "used" = false
+      AND "expiresAt" > NOW()
+      AND "failedAttempts" < 5
+    RETURNING "id", "failedAttempts", "used"
+  `;
+  return rows[0] ?? null;
+}
+
 export async function requestRegisterCode(req: Request, res: Response) {
   try {
     const { email } = req.body;
@@ -23,12 +59,14 @@ export async function requestRegisterCode(req: Request, res: Response) {
       return res.status(400).json({ error: "Email is required" });
     }
 
+    const normalizedEmail = String(email).trim().toLowerCase();
+
     const existing = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     });
 
     if (existing) {
-      return res.status(400).json({ error: "Email already used" });
+      return res.json({ message: "Verification code sent" });
     }
 
     const code = generateVerificationCode();
@@ -37,7 +75,7 @@ export async function requestRegisterCode(req: Request, res: Response) {
 
     await prisma.emailVerificationCode.updateMany({
       where: {
-        email,
+        email: normalizedEmail,
         used: false,
       },
       data: {
@@ -47,13 +85,13 @@ export async function requestRegisterCode(req: Request, res: Response) {
 
     await prisma.emailVerificationCode.create({
       data: {
-        email,
+        email: normalizedEmail,
         codeHash,
         expiresAt,
       },
     });
 
-    await sendVerificationCodeEmail(email, code);
+    await sendVerificationCodeEmail(normalizedEmail, code);
 
     return res.json({ message: "Verification code sent" });
   } catch (error) {
@@ -103,10 +141,44 @@ export async function registerWithCode(req: Request, res: Response) {
       return res.status(400).json({ error: "Verification code expired" });
     }
 
+    if (verification.failedAttempts >= 5) {
+      return res.status(400).json({
+        error: "Too many failed attempts. This verification code has been invalidated. Please request a new code.",
+      });
+    }
+
     const codeHash = hashVerificationCode(code);
 
     if (codeHash !== verification.codeHash) {
-      return res.status(400).json({ error: "Invalid verification code" });
+      const attempt = await recordFailedRegistrationCodeAttempt(verification.id);
+      if (!attempt || attempt.failedAttempts >= 5) {
+        return res.status(400).json({
+          error: "Too many failed attempts. This verification code has been invalidated. Please request a new code.",
+        });
+      }
+
+      const remaining = 5 - attempt.failedAttempts;
+      return res.status(400).json({
+        error: `Invalid verification code. ${remaining} attempt${remaining === 1 ? "" : "s"} remaining.`,
+      });
+    }
+
+    const consumption = await prisma.emailVerificationCode.updateMany({
+      where: {
+        id: verification.id,
+        used: false,
+        expiresAt: { gt: new Date() },
+        failedAttempts: { lt: 5 },
+      },
+      data: {
+        used: true,
+      },
+    });
+
+    if (consumption.count === 0) {
+      return res.status(400).json({
+        error: "Verification code is no longer valid, has expired, or reached maximum attempts.",
+      });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -122,15 +194,6 @@ export async function registerWithCode(req: Request, res: Response) {
         email: true,
         fullName: true,
         createdAt: true,
-      },
-    });
-
-    await prisma.emailVerificationCode.update({
-      where: {
-        id: verification.id,
-      },
-      data: {
-        used: true,
       },
     });
 
@@ -258,26 +321,52 @@ export async function confirmEmailChange(req: AuthRequest, res: Response) {
       return res.status(400).json({ error: "Verification code expired" });
     }
 
+    if (pendingChange.failedAttempts >= 5) {
+      return res.status(400).json({
+        error: "Too many failed attempts. This verification code has been invalidated. Please request a new code.",
+      });
+    }
+
     const codeHash = hashVerificationCode(code);
 
     if (codeHash !== pendingChange.codeHash) {
-      return res.status(400).json({ error: "Invalid verification code" });
+      const attempt = await recordFailedEmailChangeAttempt(pendingChange.id);
+      if (!attempt || attempt.failedAttempts >= 5) {
+        return res.status(400).json({
+          error: "Too many failed attempts. This verification code has been invalidated. Please request a new code.",
+        });
+      }
+
+      const remaining = 5 - attempt.failedAttempts;
+      return res.status(400).json({
+        error: `Invalid verification code. ${remaining} attempt${remaining === 1 ? "" : "s"} remaining.`,
+      });
     }
 
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: userId },
-        data: {
-          email: normalizedEmail,
-        },
-      }),
-      prisma.pendingEmailChange.update({
-        where: { id: pendingChange.id },
-        data: {
-          used: true,
-        },
-      }),
-    ]);
+    const consumption = await prisma.pendingEmailChange.updateMany({
+      where: {
+        id: pendingChange.id,
+        used: false,
+        expiresAt: { gt: new Date() },
+        failedAttempts: { lt: 5 },
+      },
+      data: {
+        used: true,
+      },
+    });
+
+    if (consumption.count === 0) {
+      return res.status(400).json({
+        error: "Verification code is no longer valid, has expired, or reached maximum attempts.",
+      });
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        email: normalizedEmail,
+      },
+    });
 
     return res.json({
       message: "Email updated successfully",

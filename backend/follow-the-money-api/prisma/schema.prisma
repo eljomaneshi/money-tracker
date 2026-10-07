@@ -126,25 +126,27 @@ model AccountAction {
 }
 
 model EmailVerificationCode {
-  id        Int      @id @default(autoincrement())
-  email     String
-  codeHash  String
-  expiresAt DateTime
-  used      Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id             Int      @id @default(autoincrement())
+  email          String
+  codeHash       String
+  expiresAt      DateTime
+  failedAttempts Int      @default(0)
+  used           Boolean  @default(false)
+  createdAt      DateTime @default(now())
 
   @@index([email])
 }
 
 model PendingEmailChange {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  newEmail  String
-  codeHash  String
-  expiresAt DateTime
-  used      Boolean  @default(false)
-  createdAt DateTime @default(now())
-  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  newEmail       String
+  codeHash       String
+  expiresAt      DateTime
+  failedAttempts Int      @default(0)
+  used           Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  User           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([newEmail])
   @@index([userId])
