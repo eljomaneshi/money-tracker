@@ -1,34 +1,34 @@
 # Money Tracker
 
-A full-stack personal finance tracker built with React, Vite, Express.js, Prisma, MySQL, and Railway.
+A full-stack personal finance tracker built with React, Vite, Express.js, Prisma, PostgreSQL (Supabase / Docker), and Railway.
 
 ## Overview
 
 Money Tracker is an ongoing full-stack web application for managing personal finances in one place. It allows users to track accounts and resources, record expenses, manage recurring subscriptions, and monitor total balances across their financial data.
 
-The project combines a React + Vite frontend with an Express.js backend, Prisma ORM, and MySQL database. It is designed as a practical real-world portfolio project focused on finance workflows, authentication, relational data handling, and production deployment with Railway.
+The project combines a React + Vite frontend with an Express.js backend, Prisma ORM, and PostgreSQL database. In production, the backend is hosted on Railway and connects to a managed PostgreSQL database on Supabase; in local development, it runs against a local PostgreSQL container orchestrated via Docker Compose.
 
 ## Features
 
-- Secure user authentication.
+- Secure user authentication with cryptographically secure email verification codes.
 - Account and resource management for tracking where money is stored.
 - Expense tracking with balance updates tied to accounts.
 - Subscription tracking for recurring payments.
-- Dashboard totals across financial resources.
+- Dashboard totals across financial resources with first-time onboarding guidance.
 - Currency-aware finance flows, including ALL and EUR handling.
 - Support for account balance logic and transfer-related finance flows.
-- Backend API built with Express and Prisma.
-- Railway-ready production setup using environment variables.
+- Backend API built with Express, TypeScript, and Prisma ORM.
+- Production-ready deployment architecture using Railway (API) and Supabase (PostgreSQL).
 
 ## Tech Stack
 
 | Layer | Technologies |
 |------|------|
-| Frontend | React, Vite, TypeScript |
-| Backend | Node.js, Express.js, TypeScript |
-| Database | MySQL |
+| Frontend | React 19, Vite, TypeScript, Tailwind CSS 4 |
+| Backend | Node.js, Express.js (v5), TypeScript |
+| Database | PostgreSQL (Supabase in production, Docker in local dev) |
 | ORM | Prisma |
-| Deployment | Railway |
+| Deployment | Railway (API), Supabase (PostgreSQL) |
 
 The stack was chosen to build a realistic full-stack finance application with a modern frontend, structured backend, relational database modeling, and straightforward deployment.
 
@@ -40,14 +40,14 @@ money-tracker/
 │   └── follow-the-money-api/        # Express + Prisma API
 │       ├── prisma/
 │       │   ├── migrations/          # Database migration history
-│       │   └── schema.prisma        # Prisma schema
+│       │   └── schema.prisma        # Prisma schema (PostgreSQL datasource)
 │       ├── src/
 │       │   ├── controllers/         # Request handlers
 │       │   ├── cron/                # Scheduled jobs / reminders
 │       │   ├── lib/                 # Shared backend helpers
-│       │   ├── middleware/          # Auth and request middleware
+│       │   ├── middleware/          # Auth, rate limiting, and request middleware
 │       │   ├── routes/              # API routes
-│       │   ├── services/            # Business logic
+│       │   ├── services/            # Business logic & email dispatch
 │       │   ├── utils/               # Utility functions
 │       │   ├── config.ts            # Environment/config loading
 │       │   └── server.ts            # Backend entry point
@@ -57,17 +57,25 @@ money-tracker/
 ├── frontend/                        # React + Vite client
 │   ├── public/
 │   ├── src/
-│   │   ├── components/              # Reusable UI components
-│   │   ├── contexts/                # React context providers
-│   │   ├── lib/                     # Frontend shared logic
-│   │   ├── pages/                   # Main app pages
+│   │   ├── components/              # Reusable UI components & onboarding
+│   │   ├── contexts/                # React context providers (AuthContext)
+│   │   ├── lib/                     # Frontend shared logic & API client
+│   │   ├── pages/                   # Main app and trust pages
 │   │   ├── utils/                   # Utility helpers
-│   │   ├── App.tsx                  # Root app component
+│   │   ├── App.tsx                  # Root app router & layout
 │   │   └── main.tsx                 # Frontend entry point
+│   ├── .env.example                 # Example frontend environment variables
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── vite.config.ts
-├── screenshots/
+├── docs/                            # Architecture, roadmap & migration manuals
+│   ├── ANTIGRAVITY-CONTINUATION.md  # Session continuation & task roadmap
+│   ├── improvement-roadmap.md       # Product & security improvement roadmap
+│   ├── repository-audit.md          # Comprehensive codebase audit
+│   ├── baseline-check.md            # Diagnostic check results
+│   ├── MIGRATION_STATUS.md          # PostgreSQL migration verification log
+│   └── mysql-to-postgres-migration.md # Historical migration runbook
+├── screenshots/                     # Application screenshots
 │   ├── register.png
 │   ├── login.png
 │   ├── dashboard-light.png
@@ -78,6 +86,8 @@ money-tracker/
 │   ├── notes.png
 │   ├── settings-account.png
 │   └── settings-preferences.png
+├── docker-compose.postgres.yml      # Local PostgreSQL container definition
+├── .env.example                     # Global environment variables template
 ├── README.md
 └── LICENSE
 ```
@@ -130,9 +140,8 @@ Here are some screens from the current version of the application.
 
 Make sure you have:
 
-- Node.js installed.
-- npm installed.
-- MySQL running locally or a remote MySQL database available.
+- **Node.js** (v18+ recommended) and **npm** installed.
+- **Docker & Docker Compose** (for running local PostgreSQL) or a local/remote PostgreSQL 16+ instance.
 
 ### 1. Clone the repository
 
@@ -141,157 +150,201 @@ git clone https://github.com/eljomaneshi/money-tracker.git
 cd money-tracker
 ```
 
-### 2. Create the backend environment file
+### 2. Configure environment files
 
-Copy the example file:
+Copy the example environment files for both backend and frontend:
 
+**Backend:**
 ```bash
 cp backend/follow-the-money-api/.env.example backend/follow-the-money-api/.env
 ```
+*(On Windows PowerShell: `Copy-Item "backend/follow-the-money-api/.env.example" "backend/follow-the-money-api/.env"`)*
 
-On Windows PowerShell:
-
-```powershell
-Copy-Item "backend/follow-the-money-api/.env.example" "backend/follow-the-money-api/.env"
+**Frontend:**
+```bash
+cp frontend/.env.example frontend/.env
 ```
+*(On Windows PowerShell: `Copy-Item "frontend/.env.example" "frontend/.env"`)*
 
-Then update the values in:
+### 3. Start local PostgreSQL
 
-```text
-backend/follow-the-money-api/.env
-```
-
-### 3. Install dependencies
-
-Frontend:
+Start the PostgreSQL 16 container via Docker Compose from the project root:
 
 ```bash
-cd frontend
+docker compose -f docker-compose.postgres.yml up -d
+```
+
+Confirm the container is running:
+
+```bash
+docker ps --filter "name=money_tracker_postgres"
+```
+
+### 4. Install dependencies
+
+**Backend:**
+```bash
+cd backend/follow-the-money-api
 npm install
 ```
 
-Backend:
+**Frontend:**
+```bash
+cd ../../frontend
+npm install
+```
+
+### 5. Generate Prisma client & apply database migrations
+
+From `backend/follow-the-money-api`:
 
 ```bash
 cd ../backend/follow-the-money-api
-npm install
-```
-
-### 4. Generate Prisma client
-
-From the backend folder:
-
-```bash
 npx prisma generate
+npx prisma migrate deploy
 ```
 
-### 5. Run the backend
+*(Optional: Run `npm run db:validate` to test PostgreSQL connection, all 8 models, and transactional CRUD).*
+
+### 6. Run the backend
+
+From `backend/follow-the-money-api`:
 
 ```bash
 npm run dev
 ```
 
-### 6. Run the frontend
+The backend API will start on `http://localhost:4000`.
 
-Open a new terminal and run:
+### 7. Run the frontend
+
+In a separate terminal, start the Vite development server:
 
 ```bash
 cd frontend
 npm run dev
 ```
 
-The frontend will typically run on `http://localhost:5173`, and the backend will run on its configured port.
+The frontend client will start on `http://localhost:5173` and connect to the backend at `http://localhost:4000`.
 
 ## Environment Variables
 
-The backend example file is located at:
+### Backend (`backend/follow-the-money-api/.env`)
 
-```text
-backend/follow-the-money-api/.env.example
-```
-
-Create a local `.env` file from that example and provide real values.
-
-### Example
+The backend environment template is located at [backend/follow-the-money-api/.env.example](./backend/follow-the-money-api/.env.example):
 
 ```env
-PORT=3000
+PORT=4000
 NODE_ENV=development
 
-DATABASE_URL=mysql://USER:PASSWORD@HOST:3306/DATABASE_NAME
+# Database Connection (PostgreSQL)
+# Local development default (Docker):
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/money_tracker?schema=public
+DIRECT_URL=postgresql://postgres:postgres@localhost:5432/money_tracker?schema=public
 
+# Supabase Production Reference:
+# DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?pgbouncer=true
+# DIRECT_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres
+
+# Authentication
 JWT_SECRET=replace_with_a_long_random_secret
 
+# Email Service (Resend)
 RESEND_API_KEY=re_xxxxxxxxxxxxxxxxx
 EMAIL_FROM=you@example.com
 
+# Allowed Frontend Origin (CORS)
 FRONTEND_URL=http://localhost:5173
+```
+
+### Frontend (`frontend/.env`)
+
+The frontend environment template is located at [frontend/.env.example](./frontend/.env.example):
+
+```env
+# Backend API Base URL
+VITE_API_URL=http://localhost:4000
 ```
 
 ### Notes
 
-- Never commit a real `.env` file.
-- Use `.env.example` only for documentation and placeholders.
-- In production, secrets should be stored in Railway Variables instead of the repository.
+- Never commit a real `.env` file to Git.
+- Use `.env.example` templates only for documentation and safe placeholders.
+- In production, secrets are configured securely in Railway Environment Variables.
 
 ## Database and Prisma
 
-The backend uses Prisma with MySQL for schema management and data access. Prisma handles the database models, client generation, and migrations used by the API.
+The backend uses Prisma ORM with PostgreSQL for schema management, migrations, and type-safe database queries.
 
-Useful backend commands:
+In production on Supabase, the application leverages connection pooling:
+- `DATABASE_URL`: Connects to PgBouncer connection pooler on port `6543` (`?pgbouncer=true`) for application query scaling.
+- `DIRECT_URL`: Connects directly to PostgreSQL on session port `5432` for executing Prisma migrations.
+
+Useful database commands (from `backend/follow-the-money-api`):
 
 ```bash
+# Generate Prisma client
 npx prisma generate
+
+# Apply pending migrations (production deployment and local setup)
+npx prisma migrate deploy
+
+# Create and apply migrations during schema changes in development
 npx prisma migrate dev
-```
 
-Run them from:
-
-```text
-backend/follow-the-money-api
+# Validate PostgreSQL connection, all 8 models, and transactional CRUD
+npm run db:validate
 ```
 
 ## Deployment
 
-The project is deployed with Railway. Railway is used to manage backend environment variables and production configuration instead of storing real secrets in the repository.
+The production architecture is decoupled across two services:
+- **Backend API:** Hosted on Railway (`follow-the-money-api`).
+- **Production Database:** Managed PostgreSQL on Supabase (EU West region).
 
-### Backend deployment
+### Backend Deployment (Railway)
 
-Important production variables include:
+Railway runs the Express API with `npm start` (`prisma migrate deploy && node dist/server.js`), automatically executing pending database migrations before launching the web server.
 
-- `DATABASE_URL`
-- `JWT_SECRET`
-- `RESEND_API_KEY`
-- `EMAIL_FROM`
-- `FRONTEND_URL`
+Required Railway Environment Variables:
+- `DATABASE_URL` — Supabase pooled connection string (`port 6543`, `?pgbouncer=true`).
+- `DIRECT_URL` — Supabase direct connection string (`port 5432`) used by Prisma migrations.
+- `JWT_SECRET` — Long random secret for signing authentication tokens.
+- `RESEND_API_KEY` — API key for transactional emails.
+- `EMAIL_FROM` — Verified sender address (e.g. `noreply@moneytracker.online`).
+- `FRONTEND_URL` — Allowed origin URL for CORS (e.g. `https://moneytracker.online`).
+- `PORT` — Port assigned dynamically by Railway (or fallback `4000`).
+- `NODE_ENV` — `production`.
 
-### Important deployment note
+### Important Deployment Notes
 
-A real `.env` file is used only for local development. Production secrets are managed in Railway and should never be committed to GitHub.
+- Real `.env` files are used exclusively for local development and are excluded from Git.
+- Railway Pre-deploy Command must remain empty (Prisma migrations are deployed automatically as part of `npm start`).
+- Railway Custom Start Command must remain `npm start`.
 
-### Suggested deployment flow
+### Suggested Deployment Flow
 
-1. Push your latest code to GitHub.
-2. Make sure the Railway backend service is connected to the correct repository and branch.
-3. Confirm all required variables are set in Railway.
-4. Redeploy after important backend config changes if needed.
+1. Push your verified changes to GitHub (`main` branch).
+2. Ensure the Railway service is connected to the repository and branch.
+3. Confirm all required production variables (`DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, etc.) are configured in Railway Variables.
+4. Railway automatically builds and restarts the container upon receiving new commits.
 
 ## Security Notes
 
-- Real `.env` files should stay local only.
-- The repository includes an example env file for setup guidance.
-- Git history and tracked files should be checked before making a repository public. Secret scanning is a good practice for that workflow.
-- Production secrets should live in Railway Variables, not in source control.
+- Real `.env` files should stay local only and never be checked into version control.
+- Passwords are encrypted with bcrypt; verification codes are generated using cryptographically secure random integers (`crypto.randomInt`) and stored as SHA-256 hashes.
+- Route-level rate limiting is enforced on sensitive authentication endpoints.
+- Production secrets live in Railway Variables, not in source control.
 
 ## Roadmap
 
 Planned or possible future improvements include:
 
-- More dashboard polish and analytics.
-- Additional reporting and balance insights.
+- Safe personal data export (JSON / CSV).
+- Dedicated `/health` endpoint verifying live database connectivity.
+- Privacy-preserving, opt-in Claude/AI insights using minimized aggregate data.
+- More dashboard polish, reporting, and balance insights.
 - Continued refinement of currency handling and account transfer flows.
-- UI improvements and possible theme support.
-- More polished auth and account-related screens.
 
 ## License
 
