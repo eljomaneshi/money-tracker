@@ -3,10 +3,10 @@
 ## 1. Repository & Git State
 - **Repository:** `eljomaneshi/money-tracker`
 - **Branch:** `main`
-- **Latest pushed commit:** `95fd76f feat(dashboard): add first-time user onboarding checklist`
+- **Latest pushed commit:** `7289d83 feat(ui): add actionable empty states across primary views`
 - **Local branch state:** Synchronized with `origin/main`.
 - **Working tree:** Clean (except unstaged `docs/ANTIGRAVITY-CONTINUATION.md`).
-- **Deployment state:** Commits `3bad3ce`, `8ab1bab`, and `95fd76f` have not been deployed to production.
+- **Deployment state:** Commits `3bad3ce`, `8ab1bab`, `95fd76f`, and `7289d83` have not been deployed to production.
 - **Rule:** Do not deploy without explicit later approval.
 
 ---
@@ -78,6 +78,34 @@ Task 4 was implemented, verified, committed, and pushed to `main`.
 - `git diff --check` passed with 0 errors or whitespace issues.
 - Task 4 was committed as `95fd76f` and pushed to `origin/main`.
 
+### Commit 7289d83 — Actionable Empty States Across Primary Views (Task 5)
+Task 5 was implemented, verified, committed, and pushed to `main`.
+**Files changed in commit `7289d83`:**
+- `frontend/src/pages/Balance.tsx`
+- `frontend/src/pages/Expenses.tsx`
+- `frontend/src/pages/Subscriptions.tsx`
+- `frontend/src/pages/Notes.tsx`
+
+**Delivered behavior:**
+- **Balances:** Replaced static "No accounts found." with an actionable empty-state card featuring the `Wallet` icon, title "No accounts yet", descriptive copy, and a primary "Add your first account" CTA. Clicking the CTA smoothly scrolls to the inline Add New Account form and focuses the Account Name input via typed ref.
+- **Activity:** Uses the complete combined activity collection (`activityItems`, encompassing both expenses and account actions: deposits, withdrawals, transfers) to distinguish states:
+  - *True first-use:* when `activityItems.length === 0`, renders an onboarding card with `Receipt` icon, title "No activity recorded yet", description, and primary "Log your first expense" CTA that smoothly scrolls to and focuses the Amount input.
+  - *Filtered no-results:* when `activityItems.length > 0 && filteredActivity.length === 0`, renders a filter empty card with `Filter` icon, title "No activity matches your filters", description, and a "Clear all filters" CTA calling `clearFilters()`.
+- **Subscriptions:**
+  - *True first-use:* when `subscriptions.length === 0`, the Active Subscriptions section displays an actionable onboarding card with `Repeat` icon, title "No subscriptions tracked yet", description, and primary "Add a subscription" CTA that smoothly scrolls to and focuses the Subscription Name input.
+  - *Non-onboarding fallback:* when subscriptions exist but none are active (`subscriptions.length > 0 && activeSubscriptions.length === 0`), displays subtle "No active subscriptions." fallback rather than the onboarding CTA.
+  - *Cancelled subscriptions:* preserves subtle "No cancelled subscriptions." fallback.
+- **Notes:** Cleanly distinguishes states:
+  - *True first-use:* when `notes.length === 0`, renders an onboarding card with `NotebookText` icon, title "No notes yet", description, and primary "Create a note" CTA that smoothly scrolls to and focuses the Note Title input.
+  - *Filtered no-results:* when `notes.length > 0 && filteredNotes.length === 0`, renders a filter empty card with `NotebookText` icon, title "No notes match the selected filters", description, and a "Reset filters" CTA calling `resetFilters()`.
+- **Preserved existing views:** All existing tables, cards, view modes (comfortable/compact/list), modals (edit, delete, actions), charts, summaries, PDF exports, and pagination remain completely preserved when records exist.
+- **Design & Accessibility:** Semantic headings (`<h3>`), native `button type="button"`, decorative `aria-hidden="true"` icons, keyboard accessibility with visible focus rings, and Tailwind light/dark styling matching the existing application aesthetic.
+
+**Verification performed:**
+- `npm run build` (`tsc -b && vite build`) passed with exit code 0.
+- `git diff --check` passed with 0 errors or whitespace issues.
+- Task 5 was committed as `7289d83` and pushed to `origin/main`.
+
 *No backend, database, Prisma schema, migration, package dependency, Docker, deployment, or `.env` files were modified.*
 
 ---
@@ -123,16 +151,16 @@ The local development environment has been tested and verified operational:
 2. Public Privacy, Terms, and Security trust pages (`/privacy`, `/terms`, `/security`).
 3. Frontend Authentication UX Improvements (`8ab1bab`).
 4. First-time user onboarding checklist on Dashboard (`95fd76f`).
+5. Actionable empty states for Balances, Activity, Subscriptions, and Notes (`7289d83`).
 
 ### Next Planned Task (Not Yet Approved or Implemented):
-5. **Actionable empty states for Balances, Activity, Subscriptions, and Notes:**
-   - Design and implement clear, actionable empty states across primary views when no data exists.
-   - Provide direct call-to-action buttons (e.g. "Add your first account", "Log your first expense", "Add a subscription", "Create a note").
-   - Maintain existing full-data views, search, filter, and table layouts when items are present.
+6. **Safe frontend session-expiry handling (via global 401 Axios interceptor):**
+   - Implement a safe, global response interceptor in the Axios client configuration (`frontend/src/lib/api.ts`).
+   - Automatically handle 401 Unauthorized errors caused by expired JWT sessions without crashing or hanging requests.
+   - Clear authentication state, remove stale session tokens, and transition user to login with appropriate feedback.
    - Boundaries: Frontend-only, begin with a read-only audit and plan, and wait for explicit approval before modifying any files.
 
 ### Future Tasks (One at a Time):
-6. Safe frontend session-expiry handling (via global 401 Axios interceptor).
 7. Visible user feedback/contact path (`founder@moneytracker.online`).
 8. Modernize README and documentation from outdated MySQL references to current PostgreSQL / Supabase / Railway architecture.
 9. Evaluate safe personal data export (JSON / CSV).
@@ -143,9 +171,9 @@ The local development environment has been tested and verified operational:
 ---
 
 ## 6. Next-Task Boundaries
-- Must begin with a read-only audit and plan of existing empty states across Balances, Activity, Subscriptions, and Notes before making changes.
+- Must begin with a read-only audit and plan of existing session-handling, token storage, and Axios interceptor setup before making changes.
 - Must wait for explicit user approval before modifying any files.
-- Must be frontend-only and focused on actionable empty states.
+- Must be frontend-only and focused on safe session-expiry handling.
 - Must not alter backend logic, database behavior, migrations, dependencies, deployment, or environment files.
 
 ---
