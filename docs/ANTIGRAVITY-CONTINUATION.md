@@ -3,7 +3,7 @@
 ## 1. Repository & Git State
 - **Repository:** `eljomaneshi/money-tracker`
 - **Branch:** `main`
-- **Latest pushed commit:** `67af4ce feat(auth): handle expired sessions via global 401 axios interceptor`
+- **Latest pushed commit:** `ae9b1b0 feat(ui): add visible feedback and founder contact links`
 - **Local branch state:** Synchronized with `origin/main`.
 - **Working tree:** Clean (except unstaged `docs/ANTIGRAVITY-CONTINUATION.md`).
 - **Rule:** Do not deploy without explicit later approval.
@@ -127,6 +127,24 @@ Task 6 was implemented, verified, committed, and pushed to `main`.
 - Zero lint errors or warnings were introduced by Task 6.
 - Task 6 was committed as `67af4ce` and pushed to `origin/main`.
 
+### Commit ae9b1b0 — Visible User Feedback & Founder Contact Paths (Task 7)
+Task 7 was implemented, verified, committed, and pushed to `main`.
+**Files changed in commit `ae9b1b0`:**
+- `frontend/src/components/Layout.tsx`
+- `frontend/src/pages/Settings.tsx`
+
+**Delivered behavior:**
+- **Persistent Desktop Utility Link:** Added a visible "Feedback & Support" link in the authenticated desktop sidebar utility area above the logout button, styled with `Mail` icon, accessible hover states, and direct mailto link: `mailto:founder@moneytracker.online?subject=Money%20Tracker%20Feedback`.
+- **Mobile Drawer Support Link:** Added matching "Feedback & Support" link in the mobile navigation drawer that automatically closes the drawer (`onClick={() => setMobileMenuOpen(false)}`) when activated.
+- **Dedicated Settings Card:** Added a comprehensive "Feedback & Support" card directly above the Danger zone in `Settings.tsx`, featuring an emerald `Mail` badge, descriptive helper text, explicit display of `founder@moneytracker.online`, and a primary "Send email" CTA button pointing to the identical mailto URI.
+- **Design & Theme Alignment:** Fully integrated with Tailwind light/dark theme tokens, subtle borders, high-contrast readable typography, and keyboard focus outlines without altering any global routes, dependencies, or backend services.
+
+**Verification performed:**
+- `npm run build` (`tsc -b && vite build`) passed with exit code 0.
+- `git diff --check` passed with 0 errors or whitespace issues.
+- Confirmed only the two approved frontend files were included in commit `ae9b1b0`.
+- Task 7 was committed as `ae9b1b0` and pushed to `origin/main`.
+
 *No backend, database, Prisma schema, migration, package dependency, Docker, deployment, or `.env` files were modified.*
 
 ---
@@ -174,14 +192,14 @@ The local development environment has been tested and verified operational:
 4. First-time user onboarding checklist on Dashboard (`95fd76f`).
 5. Actionable empty states for Balances, Activity, Subscriptions, and Notes (`7289d83`).
 6. Safe frontend session-expiry handling via global 401 Axios interceptor (`67af4ce`).
+7. Visible user feedback/contact path (`founder@moneytracker.online`) (`ae9b1b0`).
 
 ### Next Planned Task (Not Yet Approved or Implemented):
-7. **Visible user feedback/contact path (`founder@moneytracker.online`):**
-   - Provide a clear, accessible feedback/contact mechanism or link to `founder@moneytracker.online`.
-   - Boundaries: Frontend/UI-only, begin with a read-only audit and plan, and wait for explicit approval before modifying any files.
+8. **Modernize README and documentation from outdated MySQL references to current PostgreSQL / Supabase / Railway architecture:**
+   - Audit and update `README.md` and repository documentation to accurately reflect active PostgreSQL / Prisma / Supabase / Railway setup.
+   - Boundaries: Documentation-only, begin with a read-only audit and plan, and wait for explicit approval before modifying any files.
 
 ### Future Tasks (One at a Time):
-8. Modernize README and documentation from outdated MySQL references to current PostgreSQL / Supabase / Railway architecture.
 9. Evaluate safe personal data export (JSON / CSV).
 10. Improve `/health` endpoint to verify database connectivity.
 11. Only later evaluate an opt-in, privacy-preserving Claude feature using minimized aggregate data only.
@@ -190,10 +208,10 @@ The local development environment has been tested and verified operational:
 ---
 
 ## 6. Next-Task Boundaries
-- Must begin with a read-only audit and plan of existing UI layout, navigation, footers, or settings for placing the feedback/contact path before making changes.
+- Must begin with a read-only audit and plan of existing repository documentation (including `README.md`, any setup guides, and doc references) to identify outdated MySQL or obsolete architectural notes before making changes.
 - Must wait for explicit user approval before modifying any files.
-- Must be frontend-only and focused on the visible user feedback/contact mechanism (`founder@moneytracker.online`).
-- Must not alter backend logic, database behavior, migrations, dependencies, deployment, or environment files.
+- Must be documentation-only, focusing strictly on reflecting the verified PostgreSQL, Prisma, Supabase, and Railway architecture.
+- Must not alter application code, database schema, migrations, dependencies, deployment settings, or secret files.
 
 ---
 
