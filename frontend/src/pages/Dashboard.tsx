@@ -11,6 +11,7 @@ import {
 import { Link } from "react-router-dom";
 import api from "../lib/api";
 import { formatMoney } from "../utils/formatMoney";
+import OnboardingChecklist from "../components/OnboardingChecklist";
 
 type Currency = "ALL" | "EUR" | "GBP" | "USD";
 type AccountType = "BANK" | "CASH" | "CRYPTO" | "OTHER";
@@ -329,6 +330,14 @@ export default function Dashboard() {
           </Link>
         </div>
       </div>
+
+      <OnboardingChecklist
+        accountsCount={accounts.length}
+        expensesCount={expenses.length}
+        subscriptionsCount={subscriptions.length}
+        userEmail={settings?.email}
+        loading={loading}
+      />
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#0f1b3d] sm:p-8">
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
