@@ -3,7 +3,7 @@
 ## 1. Repository & Git State
 - **Repository:** `eljomaneshi/money-tracker`
 - **Branch:** `main`
-- **Latest pushed commit:** `e27c6d0 feat(settings): add user-scoped personal data export in JSON and CSV formats`
+- **Latest pushed commit:** `4064fe0 feat(api): verify database connectivity in /health endpoint`
 - **Local branch state:** Synchronized with `origin/main`.
 - **Working tree:** Clean (except unstaged `docs/ANTIGRAVITY-CONTINUATION.md`).
 - **Rule:** Do not deploy without explicit later approval.
@@ -198,6 +198,27 @@ Task 9 was implemented, reviewed locally, verified with clean builds, committed,
 - Confirmed only the four approved files were included in commit `e27c6d0`.
 - Task 9 was committed as `e27c6d0` and pushed to `origin/main`.
 
+### Commit 4064fe0 — Database Connectivity Check in /health Endpoint (Task 10)
+Task 10 was implemented, reviewed locally, verified with clean builds, committed, and pushed to `main`.
+**Files changed in commit `4064fe0`:**
+- `backend/follow-the-money-api/src/app.ts`
+
+**Delivered behavior:**
+- **Asynchronous Health Handler:** Replaced static JSON response on `GET /health` with an async handler that pings the live database.
+- **Lightweight Connection Ping:** Executes `prisma.$queryRaw` with `SELECT 1` inside a `Promise.race` bounded by an explicit 3,000 ms timeout.
+- **Timer Cleanup:** Clears the timeout handle with `clearTimeout(timer)` on both success and error resolution to prevent unneeded event loop retention.
+- **Cache-Prevention Headers:** Configured `Cache-Control: no-store, no-cache, must-revalidate` so health status is never cached by proxies or CDNs.
+- **Healthy Path (HTTP 200):** Returns `{ status: "ok", message: "Express + Prisma + PostgreSQL ready", database: "connected" }`.
+- **Unhealthy / Timeout Path (HTTP 503):** Logs internal error server-side (`console.error`) and returns sanitized `{ status: "error", message: "Database connectivity check failed", database: "disconnected" }` without leaking connection strings, credentials, or internal stack traces.
+- **Compatibility:** Fully compatible with Railway deployment health probes and preserves test assertion expectations in `test-e2e-api.ts`.
+
+**Verification performed:**
+- `npm run build` in `backend/follow-the-money-api` (`tsc`) passed with exit code 0.
+- `git diff --check` passed with 0 errors or whitespace issues.
+- `git diff --stat`: `1 file changed, 27 insertions(+), 5 deletions(-)`.
+- Confirmed only `backend/follow-the-money-api/src/app.ts` was included in commit `4064fe0`.
+- Task 10 was committed as `4064fe0` and pushed to `origin/main`.
+
 ---
 
 ## 3. Local Development Verified
@@ -247,25 +268,23 @@ The local development environment has been tested and verified operational:
 7. Visible user feedback/contact path (`founder@moneytracker.online`) (`ae9b1b0`).
 8. Modernize README from MySQL to PostgreSQL, Supabase, and Railway architecture (`a28653b`).
 9. Safe personal data export in JSON and CSV formats (`e27c6d0`).
+10. Database connectivity verification in `/health` endpoint (`4064fe0`).
 
 ### Next Planned Task (Not Yet Approved or Implemented):
-10. **Improve `/health` endpoint to verify database connectivity:**
-   - Audit existing health check implementation in `backend/follow-the-money-api/src/server.ts` or routes.
-   - Plan non-breaking enhancements to verify live database connectivity (e.g. lightweight Prisma query such as `$queryRaw` or ping) with appropriate timeout handling, status codes (200 OK vs 503 Service Unavailable), and diagnostic response payload without leaking database credentials or internal infrastructure details.
-   - Plan verification that deployment health probes (e.g. Railway) continue to function smoothly.
-   - Boundaries: Read-only audit and plan first, ensure zero downtime or deploy disruption, and wait for explicit approval before implementing.
+11. **Evaluate an opt-in, privacy-preserving Claude feature using minimized aggregate data only:**
+   - Audit existing application architecture, privacy policy commitments, and candidate data points for potential AI assistance.
+   - Ensure strict opt-in consent model, complete user control, and total omission of PII or raw transaction narratives.
+   - Boundaries: Read-only audit and plan first; do not add API keys, external SDKs, or background calls without explicit user approval.
 
 ### Future Tasks (One at a Time):
-11. Only later evaluate an opt-in, privacy-preserving Claude feature using minimized aggregate data only.
 12. Only after product improvements are complete, prepare truthful Claude Startup application materials.
 
 ---
 
 ## 6. Next-Task Boundaries
-- Must begin with a read-only audit and plan of existing `/health` endpoint implementations and routing before writing any code.
+- Must begin with a read-only audit and plan before writing any code or making any architectural changes.
 - Must wait for explicit user approval before modifying or creating any files.
-- Must verify database connectivity safely without risking connection pool exhaustion, latency spikes, or leaking connection credentials.
-- Must ensure Railway and local health checks continue to receive expected status codes and formats.
+- Must enforce strict user privacy, explicit opt-in mechanics, and minimize all data payloads to aggregate statistics only.
 - Must not alter database schema, migrations, dependencies, deployment settings, or secret files.
 
 ---
