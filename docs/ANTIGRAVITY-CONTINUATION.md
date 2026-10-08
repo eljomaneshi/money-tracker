@@ -3,7 +3,7 @@
 ## 1. Repository & Git State
 - **Repository:** `eljomaneshi/money-tracker`
 - **Branch:** `main`
-- **Latest pushed commit:** `a28653b docs: modernize README from MySQL to PostgreSQL, Supabase, and Railway architecture`
+- **Latest pushed commit:** `e27c6d0 feat(settings): add user-scoped personal data export in JSON and CSV formats`
 - **Local branch state:** Synchronized with `origin/main`.
 - **Working tree:** Clean (except unstaged `docs/ANTIGRAVITY-CONTINUATION.md`).
 - **Rule:** Do not deploy without explicit later approval.
@@ -170,6 +170,34 @@ Task 8 was implemented, verified, committed, and pushed to `main`.
 
 *No application code, database schemas, migrations, package dependencies, Docker containers, deployment configs, or `.env` files were modified.*
 
+### Commit e27c6d0 — Safe Personal Data Export in JSON and CSV Formats (Task 9)
+Task 9 was implemented, reviewed locally, verified with clean builds, committed, and pushed to `main`.
+**Files changed in commit `e27c6d0`:**
+- `backend/follow-the-money-api/src/controllers/userController.ts`
+- `backend/follow-the-money-api/src/middleware/rateLimiter.ts`
+- `backend/follow-the-money-api/src/routes/userRoutes.ts`
+- `frontend/src/pages/Settings.tsx`
+
+**Delivered behavior:**
+- **Strict User-Scoped Extraction:** Implemented `exportUserData` in `userController.ts`, fetching 6 user entities in parallel via `Promise.all` (`User`, `Account`, `Expense`, `Subscription`, `Note`, `AccountAction`), all strictly constrained by `where: { userId }` from authenticated `req.user.userId`.
+- **Credential & Secret Protection:** Excluded sensitive fields (`passwordHash`, `emailVerificationCode`, `pendingEmailChange`) via explicit Prisma `select` projection on the `User` model.
+- **Dual Export Formats:**
+  - *Full JSON Archive (`?format=json`):* Full structured data backup with metadata (`version: "1.0"`, `exportedAt`, `profile`, `accounts`, `expenses`, `subscriptions`, `notes`, `accountActions`).
+  - *CSV Activity Ledger (`?format=csv`):* Chronological spreadsheet-compatible ledger flattening expenses, account actions (deposits, withdrawals, transfers), subscriptions, and notes with standard columns: `Date`, `Type`, `Account`, `Category / Target`, `Description`, `Amount`, `Currency`, `Status`.
+- **Formula & CSV Injection Sanitization (CWE-1236):** `sanitizeCsvField` escapes dangerous leading characters (`=`, `+`, `-`, `@`, `\t`, `\r`) by prepending a single quote `'` before applying RFC 4180 double-quote escaping, protecting spreadsheet users against malicious macro execution.
+- **Anti-Caching Headers:** Configured `Cache-Control: no-store, no-cache, must-revalidate, private` and `Pragma: no-cache` so personal export files are never cached by browsers or intermediate proxies.
+- **Abuse Prevention / Rate Limiting:** Added `exportLimiter` in `rateLimiter.ts` (5 requests per 15 minutes per IP) protecting `GET /me/export` behind `requireAuth`.
+- **Settings UI Integration:** Added a "Data Portability & Export" card in `Settings.tsx` directly above the Danger Zone with dedicated buttons for JSON and CSV downloads.
+- **Frontend Download Handling & Accessibility:** Features independent loading indicators ("Generating JSON...", "Generating CSV..."), button disabling during active downloads, blob-level error extraction for 429 and 500 responses, accessible live feedback banners (`role="status"` / `role="alert"`), and clean object URL revocation.
+
+**Verification performed:**
+- `npm run build` in `backend/follow-the-money-api` (`tsc`) passed with exit code 0.
+- `npm run build` in `frontend` (`tsc -b && vite build`) passed with exit code 0.
+- `git diff --check` passed with 0 errors or whitespace issues.
+- `git diff --stat`: `4 files changed, 424 insertions(+), 1 deletion(-)`.
+- Confirmed only the four approved files were included in commit `e27c6d0`.
+- Task 9 was committed as `e27c6d0` and pushed to `origin/main`.
+
 ---
 
 ## 3. Local Development Verified
@@ -198,6 +226,7 @@ The local development environment has been tested and verified operational:
   - Login limiter enforces 10 requests per 15 minutes per IP (`loginLimiter`).
   - Request code limiter enforces 5 requests per 15 minutes per IP (`requestCodeLimiter`).
   - Submit code limiter enforces 10 requests per 15 minutes per IP (`submitCodeLimiter`).
+  - Export limiter enforces 5 requests per 15 minutes per IP (`exportLimiter`).
   - Local browser sessions share localhost IP behavior.
   - Rate limit counters reside in-memory; restarting only the local backend process clears local counters.
   - Do not weaken or disable rate limiting in production.
@@ -217,24 +246,26 @@ The local development environment has been tested and verified operational:
 6. Safe frontend session-expiry handling via global 401 Axios interceptor (`67af4ce`).
 7. Visible user feedback/contact path (`founder@moneytracker.online`) (`ae9b1b0`).
 8. Modernize README from MySQL to PostgreSQL, Supabase, and Railway architecture (`a28653b`).
+9. Safe personal data export in JSON and CSV formats (`e27c6d0`).
 
 ### Next Planned Task (Not Yet Approved or Implemented):
-9. **Evaluate safe personal data export (JSON / CSV):**
-   - Audit existing data structures and export capabilities (e.g. Activity / CSV exports).
-   - Plan comprehensive, privacy-preserving personal data export for user accounts, transactions, subscriptions, and notes.
-   - Boundaries: Read-only audit and plan first, ensure strict user-ownership scoping and secure download handling, and wait for explicit approval before implementing.
+10. **Improve `/health` endpoint to verify database connectivity:**
+   - Audit existing health check implementation in `backend/follow-the-money-api/src/server.ts` or routes.
+   - Plan non-breaking enhancements to verify live database connectivity (e.g. lightweight Prisma query such as `$queryRaw` or ping) with appropriate timeout handling, status codes (200 OK vs 503 Service Unavailable), and diagnostic response payload without leaking database credentials or internal infrastructure details.
+   - Plan verification that deployment health probes (e.g. Railway) continue to function smoothly.
+   - Boundaries: Read-only audit and plan first, ensure zero downtime or deploy disruption, and wait for explicit approval before implementing.
 
 ### Future Tasks (One at a Time):
-10. Improve `/health` endpoint to verify database connectivity.
 11. Only later evaluate an opt-in, privacy-preserving Claude feature using minimized aggregate data only.
 12. Only after product improvements are complete, prepare truthful Claude Startup application materials.
 
 ---
 
 ## 6. Next-Task Boundaries
-- Must begin with a read-only audit and plan of existing data models, controllers, and export mechanisms before writing any code.
+- Must begin with a read-only audit and plan of existing `/health` endpoint implementations and routing before writing any code.
 - Must wait for explicit user approval before modifying or creating any files.
-- Must enforce strict user-level authentication and ownership scoping (`userId`), ensuring users can only export their own records.
+- Must verify database connectivity safely without risking connection pool exhaustion, latency spikes, or leaking connection credentials.
+- Must ensure Railway and local health checks continue to receive expected status codes and formats.
 - Must not alter database schema, migrations, dependencies, deployment settings, or secret files.
 
 ---
