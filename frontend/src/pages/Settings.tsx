@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Bell,
+  Download,
+  FileJson,
+  FileSpreadsheet,
   Mail,
   Save,
   Settings as SettingsIcon,
@@ -68,6 +71,11 @@ export default function Settings() {
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [deleteAccountText, setDeleteAccountText] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
+
+  const [isExportingJson, setIsExportingJson] = useState(false);
+  const [isExportingCsv, setIsExportingCsv] = useState(false);
+  const [exportError, setExportError] = useState("");
+  const [exportSuccess, setExportSuccess] = useState("");
 
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -287,6 +295,70 @@ export default function Settings() {
       );
     } finally {
       setDeletingAccount(false);
+    }
+  };
+
+  const handleExportData = async (format: "json" | "csv") => {
+    setExportError("");
+    setExportSuccess("");
+    if (format === "json") {
+      setIsExportingJson(true);
+    } else {
+      setIsExportingCsv(true);
+    }
+
+    try {
+      const response = await api.get(`/users/me/export?format=${format}`, {
+        responseType: "blob",
+      });
+
+      const blob = new Blob([response.data], {
+        type: format === "json" ? "application/json" : "text/csv;charset=utf-8;",
+      });
+
+      const dateStr = new Date().toISOString().split("T")[0];
+      const filename =
+        format === "json"
+          ? `money-tracker-export-${dateStr}.json`
+          : `money-tracker-ledger-${dateStr}.csv`;
+
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+
+      setExportSuccess(
+        format === "json"
+          ? "Full JSON backup downloaded successfully."
+          : "CSV activity ledger downloaded successfully."
+      );
+    } catch (err: any) {
+      if (err?.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const parsed = JSON.parse(text);
+          setExportError(parsed.error || "Failed to export data. Please try again.");
+        } catch {
+          setExportError("Failed to export data. Please try again.");
+        }
+      } else if (err?.response?.status === 429) {
+        setExportError("Too many export requests. Please try again in 15 minutes.");
+      } else {
+        setExportError(
+          err?.response?.data?.error ||
+            "Failed to export data. Please check your connection and try again."
+        );
+      }
+    } finally {
+      if (format === "json") {
+        setIsExportingJson(false);
+      } else {
+        setIsExportingCsv(false);
+      }
     }
   };
 
@@ -772,6 +844,96 @@ export default function Settings() {
                 <Mail className="h-4 w-4" />
                 <span>Send email</span>
               </a>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
+          <div className="mb-6 flex items-start gap-3">
+            <div className="rounded-2xl bg-indigo-100 p-2.5 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
+              <Download className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                Data Portability & Export
+              </h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Download a complete copy of your personal financial records for backup or analysis.
+              </p>
+            </div>
+          </div>
+
+          {exportSuccess && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300"
+            >
+              {exportSuccess}
+            </div>
+          )}
+
+          {exportError && (
+            <div
+              role="alert"
+              aria-live="assertive"
+              className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+            >
+              {exportError}
+            </div>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950">
+              <div>
+                <div className="flex items-center gap-2">
+                  <FileJson className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                    JSON Data Archive
+                  </h3>
+                </div>
+                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                  Full structured backup containing your profile preferences, accounts, all expenses, subscriptions, notes, and activity history.
+                </p>
+              </div>
+
+              <div className="mt-5">
+                <button
+                  type="button"
+                  onClick={() => handleExportData("json")}
+                  disabled={isExportingJson || isExportingCsv}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-indigo-600 dark:hover:bg-indigo-700 dark:focus:ring-indigo-900/40"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>{isExportingJson ? "Generating JSON..." : "Download JSON backup"}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950">
+              <div>
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                    CSV Activity Ledger
+                  </h3>
+                </div>
+                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                  Spreadsheet-compatible ledger of all financial activity, expenses, deposits, withdrawals, and subscriptions for Excel or Google Sheets.
+                </p>
+              </div>
+
+              <div className="mt-5">
+                <button
+                  type="button"
+                  onClick={() => handleExportData("csv")}
+                  disabled={isExportingJson || isExportingCsv}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:focus:ring-slate-800"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>{isExportingCsv ? "Generating CSV..." : "Download CSV ledger"}</span>
+                </button>
+              </div>
             </div>
           </div>
         </section>

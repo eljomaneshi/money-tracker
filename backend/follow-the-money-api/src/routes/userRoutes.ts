@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
+import { exportLimiter } from "../middleware/rateLimiter";
 import {
     getMySettings,
     updateProfile,
@@ -9,11 +10,13 @@ import {
     requestEmailChangeCode,
     confirmEmailChange,
     deleteMyAccount,
+    exportUserData,
 } from "../controllers/userController";
 
 const router = Router();
 
 router.get("/me/settings", requireAuth, getMySettings);
+router.get("/me/export", requireAuth, exportLimiter, exportUserData);
 router.patch("/me/profile", requireAuth, updateProfile);
 router.patch("/me/password", requireAuth, updatePassword);
 router.patch("/me/preferences", requireAuth, updatePreferences);

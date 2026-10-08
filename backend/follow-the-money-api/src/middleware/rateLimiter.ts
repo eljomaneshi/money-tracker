@@ -29,3 +29,13 @@ export const submitCodeLimiter = rateLimit({
     error: "Too many verification attempts. Please try again later.",
   },
 });
+
+export const exportLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: 5,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: {
+    error: "Too many export requests. Please try again in 15 minutes.",
+  },
+});

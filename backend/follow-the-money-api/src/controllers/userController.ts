@@ -432,3 +432,251 @@ export const updateNotifications = async (req: AuthRequest, res: Response) => {
     return res.status(500).json({ error: "Failed to update notifications" });
   }
 };
+
+function sanitizeCsvField(val: unknown): string {
+  if (val === null || val === undefined) return "";
+  if (typeof val === "number") return val.toString();
+  let str = String(val);
+
+  // Neutralize formula injection / DDE (CWE-1236):
+  // If the cell begins with =, +, -, @, \t, or \r, prepend a single quote '
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `'${str}`;
+  }
+
+  // RFC 4180 escaping: If field contains comma, quote, or newline, escape quotes with "" and wrap in ""
+  if (str.includes('"') || str.includes(",") || str.includes("\n") || str.includes("\r")) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+export const exportUserData = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const [user, accounts, expenses, subscriptions, notes, accountActions] =
+      await Promise.all([
+        prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            createdAt: true,
+            totalsMainCurrency: true,
+            showSecondCurrency: true,
+            secondCurrency: true,
+            notifySubscriptionReminder: true,
+            notifySubscriptionCreated: true,
+            notifySubscriptionCancelled: true,
+          },
+        }),
+        prisma.account.findMany({
+          where: { userId },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        }),
+        prisma.expense.findMany({
+          where: { userId },
+          include: {
+            account: {
+              select: { id: true, name: true, baseCurrency: true },
+            },
+          },
+          orderBy: { date: "desc" },
+        }),
+        prisma.subscription.findMany({
+          where: { userId },
+          include: {
+            account: {
+              select: { id: true, name: true, baseCurrency: true },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        }),
+        prisma.note.findMany({
+          where: { userId },
+          orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+        }),
+        prisma.accountAction.findMany({
+          where: { userId },
+          include: {
+            account: {
+              select: { id: true, name: true, baseCurrency: true },
+            },
+            toAccount: {
+              select: { id: true, name: true, baseCurrency: true },
+            },
+          },
+          orderBy: { date: "desc" },
+        }),
+      ]);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const dateStr = new Date().toISOString().split("T")[0];
+    const format = String(req.query.format || "json").toLowerCase();
+
+    // Cache-prevention headers for sensitive personal exports
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    res.setHeader("Pragma", "no-cache");
+
+    if (format === "csv") {
+      const headers = [
+        "Date",
+        "Type",
+        "Account",
+        "Category / Target",
+        "Description",
+        "Amount",
+        "Currency",
+        "Status",
+      ];
+
+      interface LedgerRow {
+        date: string;
+        type: string;
+        account: string;
+        categoryOrTarget: string;
+        description: string;
+        amount: number | string;
+        currency: string;
+        status: string;
+        sortTimestamp: number;
+      }
+
+      const rows: LedgerRow[] = [];
+
+      // 1. Expenses
+      for (const exp of expenses) {
+        const d = new Date(exp.date);
+        rows.push({
+          date: d.toISOString().split("T")[0],
+          type: "Expense",
+          account: exp.account?.name || "Unassigned",
+          categoryOrTarget: exp.category,
+          description: exp.description || "",
+          amount: exp.amount,
+          currency: exp.account?.baseCurrency || user.totalsMainCurrency || "EUR",
+          status: "Completed",
+          sortTimestamp: d.getTime(),
+        });
+      }
+
+      // 2. Account Actions (Deposits, Withdrawals, Transfers)
+      for (const act of accountActions) {
+        const d = new Date(act.date);
+        let target = "";
+        if (act.toAccount) {
+          target = act.toAccount.name;
+        } else if (act.type === "DEPOSIT") {
+          target = "Deposit";
+        } else if (act.type === "WITHDRAWAL") {
+          target = "Withdrawal";
+        } else {
+          target = act.type;
+        }
+
+        rows.push({
+          date: d.toISOString().split("T")[0],
+          type: act.type.replace(/_/g, " "),
+          account: act.account?.name || "Unassigned",
+          categoryOrTarget: target,
+          description: act.description || "",
+          amount: act.amount,
+          currency: act.account?.baseCurrency || user.totalsMainCurrency || "EUR",
+          status: "Completed",
+          sortTimestamp: d.getTime(),
+        });
+      }
+
+      // 3. Subscriptions
+      for (const sub of subscriptions) {
+        const d = sub.nextBillingDate ? new Date(sub.nextBillingDate) : new Date(sub.createdAt);
+        rows.push({
+          date: d.toISOString().split("T")[0],
+          type: "Subscription",
+          account: sub.account?.name || "Unassigned",
+          categoryOrTarget: sub.billingPeriod,
+          description: sub.name,
+          amount: sub.price,
+          currency: sub.account?.baseCurrency || user.totalsMainCurrency || "EUR",
+          status: sub.status,
+          sortTimestamp: d.getTime(),
+        });
+      }
+
+      // 4. Notes
+      for (const note of notes) {
+        const d = note.dueDate ? new Date(note.dueDate) : new Date(note.createdAt);
+        rows.push({
+          date: d.toISOString().split("T")[0],
+          type: `Note (${note.type})`,
+          account: "",
+          categoryOrTarget: note.personName || note.repeatPeriod,
+          description: note.title + (note.description ? ` - ${note.description}` : ""),
+          amount: note.amount !== null && note.amount !== undefined ? note.amount : "",
+          currency: note.currency,
+          status: note.status,
+          sortTimestamp: d.getTime(),
+        });
+      }
+
+      // Sort rows chronologically descending
+      rows.sort((a, b) => b.sortTimestamp - a.sortTimestamp);
+
+      const csvLines = [
+        headers.map(sanitizeCsvField).join(","),
+        ...rows.map((r) =>
+          [
+            sanitizeCsvField(r.date),
+            sanitizeCsvField(r.type),
+            sanitizeCsvField(r.account),
+            sanitizeCsvField(r.categoryOrTarget),
+            sanitizeCsvField(r.description),
+            sanitizeCsvField(r.amount),
+            sanitizeCsvField(r.currency),
+            sanitizeCsvField(r.status),
+          ].join(",")
+        ),
+      ];
+
+      const csvContent = csvLines.join("\r\n");
+
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="money-tracker-ledger-${dateStr}.csv"`
+      );
+      return res.send(csvContent);
+    }
+
+    // Default: JSON full personal data backup
+    const exportPayload = {
+      version: "1.0",
+      exportedAt: new Date().toISOString(),
+      profile: user,
+      accounts,
+      expenses,
+      subscriptions,
+      notes,
+      accountActions,
+    };
+
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="money-tracker-export-${dateStr}.json"`
+    );
+    return res.json(exportPayload);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Failed to export personal data" });
+  }
+};
