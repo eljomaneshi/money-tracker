@@ -1,90 +1,181 @@
-# Antigravity Continuation Note
+# Current Continuation State — 2026-10-08
 
-## 1. Project Architecture
-- **Frontend:** React 19 Single Page Application built with Vite, TypeScript, Tailwind CSS 4, React Router DOM (v7), Context API (`AuthContext`), and an Axios HTTP client.
-- **Backend:** Node.js, Express.js (v5), and TypeScript, using Prisma ORM for database access, `node-cron` for scheduled subscription billing/reminders, and Resend for transactional email delivery.
+## 1. Repository & Git State
+- **Repository:** `eljomaneshi/money-tracker`
+- **Branch:** `main`
+- **Latest pushed commit:** `8ab1bab feat(auth): improve login and register error UX and accessibility`
+- **Local branch state:** Synchronized with `origin/main`.
+- **Working tree:** Clean (except unstaged `docs/ANTIGRAVITY-CONTINUATION.md`).
+- **Deployment state:** Commits `3bad3ce` and `8ab1bab` have not been deployed to production.
+- **Rule:** Do not deploy without explicit later approval.
 
 ---
 
-## 2. Active Environment File Paths
+## 2. Completed Work
+
+### Commit 3bad3ce — Public Landing & Trust Pages
+The following public frontend improvements were implemented, reviewed locally, verified with clean builds, and committed:
+- New public Landing page at `/` for unauthenticated visitors.
+- New public Privacy & Data Handling page at `/privacy`.
+- New public Terms of Use page at `/terms`.
+- New public Security Overview page at `/security`.
+- Landing page footer links to Privacy, Terms, and Security.
+- MoneyTracker logo in `AuthShell` (Login and Register) links back to `/`.
+- Public trust pages are accessible to both logged-in and logged-out visitors.
+- Authenticated application routes and navigation were fully preserved.
+
+**Files included in commit `3bad3ce`:**
+- `frontend/src/App.tsx`
+- `frontend/src/components/AuthShell.tsx`
+- `frontend/src/components/TrustPageShell.tsx`
+- `frontend/src/pages/Landing.tsx`
+- `frontend/src/pages/Privacy.tsx`
+- `frontend/src/pages/Terms.tsx`
+- `frontend/src/pages/Security.tsx`
+
+### Commit 8ab1bab — Frontend Authentication UX Improvements (Task 3)
+Task 3 was implemented, verified, committed, and pushed to `main`.
+**Files changed in commit `8ab1bab`:**
+- `frontend/src/pages/Login.tsx`
+- `frontend/src/pages/Register.tsx`
+
+**Delivered behavior:**
+- **Enumeration-resistant HTTP 401 login feedback:** Displays uniform `"Invalid email or password. Please try again."` for any 401 failure, never exposing account existence.
+- **Network disconnection handling:** Catches offline/unreachable server states (`!err.response`) with `"Unable to connect to the server. Please check your connection and try again."`
+- **HTTP 429 rate-limit handling:** Displays backend rate-limiter message (`err.response.data.error` / `message`) or safe fallback (`"Too many login attempts. Please try again later."` / `"Too many attempts. Please try again later."`).
+- **HTTP 500+ generic handling:** Masks internal server/stack traces with safe generic messages (`"An unexpected error occurred while signing in. Please try again."` / `"An unexpected error occurred. Please try again."`).
+- **Safe 400 validation-message preservation:** Preserves legitimate backend registration validation details (e.g. attempt counts remaining, invalid code, expired code, code invalidated).
+- **Accessible auth status/error live regions:** Added `role="alert"` / `aria-live="assertive"` to error containers and `role="status"` / `aria-live="polite"` to success/notice containers in both `Login.tsx` and `Register.tsx`.
+- **Updated Step 2 password copy:** Renamed password label to `"Set account password"` and added helper text `"Choose a password you will use to sign in to MoneyTracker."`
+- **Scoped error helper:** `getRegisterErrorMessage` locally defined inside `Register.tsx` to handle errors cleanly without bloating shared modules.
+
+**Verification performed:**
+- `npm run build` (`tsc -b && vite build`) succeeded with exit code 0.
+- `git diff --check` passed with 0 errors or whitespace issues.
+- Confirmed only the two approved frontend files were modified in commit `8ab1bab`.
+
+*No backend, database, Prisma schema, migration, package dependency, Docker, deployment, or `.env` files were modified.*
+
+---
+
+## 3. Local Development Verified
+The local development environment has been tested and verified operational:
+- **Frontend server:** `http://localhost:5173` (Vite dev server)
+- **Backend server:** `http://localhost:4000` (Express API)
+- **Local database:** PostgreSQL in Docker on `localhost:5432` (`docker-compose.postgres.yml`)
+
+**Verified local behavior:**
+- Local frontend build (`tsc -b && vite build`) passed with exit code 0.
+- Backend started successfully on port 4000.
+- `http://localhost:4000/health` responded with healthy status.
+- Docker PostgreSQL container was running.
+- Registration email verification requests were dispatched and accepted by Resend.
+- A new local user registration was completed end-to-end.
+- A newly created local user successfully logged in and accessed the Dashboard.
+- Local Docker PostgreSQL is completely separate from production Supabase database data.
+- Browser errors originating from `chrome-extension://`, TronLink, password-manager encryption, or disconnected port objects were verified to be client browser-extension artifacts, not MoneyTracker application errors.
+
+---
+
+## 4. Important Authentication Findings
+- **Registration code alone does not create a user:** Requesting a verification code stores a temporary hashed code record. The user account is only created in Step 2 when the code is verified and the user sets a password.
+- **Login 401 behavior:** Returns `401 Unauthorized` with `{ error: "Invalid credentials" }` when the user does not exist locally or the password does not match.
+- **Rate limiting active:**
+  - Login limiter enforces 10 requests per 15 minutes per IP (`loginLimiter`).
+  - Request code limiter enforces 5 requests per 15 minutes per IP (`requestCodeLimiter`).
+  - Submit code limiter enforces 10 requests per 15 minutes per IP (`submitCodeLimiter`).
+  - Local browser sessions share localhost IP behavior.
+  - Rate limit counters reside in-memory; restarting only the local backend process clears local counters.
+  - Do not weaken or disable rate limiting in production.
+- **Frontend error handling resolved:**
+  - In commit `8ab1bab`, `Login.tsx` and `Register.tsx` error handling was aligned with backend JSON responses (`{ error: "..." }`), while enforcing account-enumeration resistance on 401, catching offline states, handling 429 rate limits, masking 500 errors, and adding WAI-ARIA live region accessibility.
+
+---
+
+## 5. Ordered Product Roadmap
+
+### Completed:
+1. Public landing page (`/`).
+2. Public Privacy, Terms, and Security trust pages (`/privacy`, `/terms`, `/security`).
+3. Frontend Authentication UX Improvements (`8ab1bab`).
+
+### Next Planned Task (Not Yet Approved or Implemented):
+4. **First-time user onboarding checklist on Dashboard:**
+   - Display a guided onboarding checklist for new users on the Dashboard.
+   - Guide users through initial setup actions (e.g. adding initial balance/account, recording first activity, tracking a subscription).
+   - Ensure the checklist is dismissible or hides once tasks are completed.
+   - Maintain existing authenticated dashboard widgets and layouts.
+   - No backend, database, package, migration, or deployment changes.
+
+### Future Tasks (One at a Time):
+5. Actionable empty states for Balances, Activity, Subscriptions, and Notes.
+6. Safe frontend session-expiry handling (via global 401 Axios interceptor).
+7. Visible user feedback/contact path (`founder@moneytracker.online`).
+8. Modernize README and documentation from outdated MySQL references to current PostgreSQL / Supabase / Railway architecture.
+9. Evaluate safe personal data export (JSON / CSV).
+10. Improve `/health` endpoint to verify database connectivity.
+11. Only later evaluate an opt-in, privacy-preserving Claude feature using minimized aggregate data only.
+12. Only after product improvements are complete, prepare truthful Claude Startup application materials.
+
+---
+
+## 6. Next-Task Boundaries
+- Must begin with a read-only audit and plan of the Dashboard component and state before making changes.
+- Must wait for explicit user approval before modifying any files.
+- Must be frontend-only and focused on Dashboard onboarding UX.
+- Must not alter backend logic, database behavior, migrations, dependencies, deployment, or environment files.
+
+---
+
+## 7. Mandatory Safety & Production Rules
+- **Never display, read, copy, log, or commit `.env` values or secrets.**
+- **Never expose passwords, tokens, API keys, verification codes, JWTs, or database URLs.**
+- **Never access production database records or contact production APIs directly.**
+- **Do not run production migrations casually.**
+- **Never run `npx prisma db push` against production.**
+- **Never run `prisma migrate reset` against production.**
+- **Never manually edit `_prisma_migrations`.**
+- **Railway Pre-deploy Command must remain empty.**
+- **Railway Custom Start Command must remain `npm start`.**
+- **Do not force-push.**
+- **Do not install packages unless explicitly approved.**
+- **Do not stage, commit, push, or deploy without explicit approval.**
+- **Always review `git diff` and run `git diff --check` before staging or committing.**
+- **Always make small, isolated, reviewable changes.**
+
+---
+
+# Architectural Baseline & Historical Handoff Information
+
+## 8. Project Architecture
+- **Frontend:** React 19 SPA built with Vite, TypeScript, Tailwind CSS 4, React Router DOM (v7), Context API (`AuthContext`), and Axios.
+- **Backend:** Node.js, Express (v5), and TypeScript, using Prisma ORM for database access, `node-cron` for scheduled subscription billing/reminders, and Resend for transactional emails.
+- **Production Hosting:** Railway hosting Express API (`follow-the-money-api`), pointing environment variables to Supabase PostgreSQL.
+- **Production Database:** Supabase PostgreSQL:
+  - Pooled connection (`port 6543`, `?pgbouncer=true`) for application runtime queries (`DATABASE_URL`).
+  - Direct connection (`port 5432`) for Prisma migrations (`DIRECT_URL`).
+- **Production Startup:** Backend starts via `npm start`, running `prisma migrate deploy && node dist/server.js`.
+
+---
+
+## 9. Active Environment File Paths (Names Only — No Secrets)
 - **Backend Active Configuration:** `backend/follow-the-money-api/.env`
-  - Variables read: `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `FRONTEND_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, `PORT`, `NODE_ENV`.
+  - Variables referenced: `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `FRONTEND_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, `PORT`, `NODE_ENV`.
 - **Frontend Active Configuration:** `frontend/.env`
-  - Variables read: `VITE_API_URL`.
-- **Templates (Safe / Whitelisted in Git):**
+  - Variables referenced: `VITE_API_URL`.
+- **Safe Templates Tracked in Git:**
   - Root: `.env.example`
   - Backend: `backend/follow-the-money-api/.env.example`
   - Frontend: `frontend/.env.example`
 
 ---
 
-## 3. Database & Hosting Setup
-- **Local Development:** PostgreSQL 16 running via Docker (`docker-compose.postgres.yml` on port `5432`, database `money_tracker`).
-- **Production Database:** Supabase PostgreSQL (`aws-0-eu-west-1.pooler.supabase.com`):
-  - Pooled connection (`port 6543`, `?pgbouncer=true`) for runtime queries (`DATABASE_URL`).
-  - Direct connection (`port 5432`) for Prisma migrations (`DIRECT_URL`).
-- **Production Application Hosting:** Railway hosts the Express API service (`follow-the-money-api`), pointing its environment variables to the Supabase PostgreSQL database.
-
----
-
-## 4. Status of prisma+postgres
-- **Confirmed Obsolete:** `prisma+postgres://` was never used in application code, Prisma Accelerate is not installed, and the protocol was never part of production.
-- **Removed:** The unused outer `backend/.env` file that contained the reference has been deleted.
-- **Orphaned Directory:** `backend/prisma/` remains as an unused skeleton directory and can be safely deleted.
-
----
-
-## 5. Git History & Secrets Status
-- **Confirmed Clean:** A comprehensive search across all commits and branches confirmed that **no real secrets, passwords, or API keys** were ever committed to Git history.
-- All historical occurrences of credential variable names in tracked files were either code references (`process.env.*`) or template placeholders.
-
----
-
-## 6. Current Git & .gitignore Status
-- **Ignored:** All `.env*` files are strictly ignored across the entire repository tree. `git check-ignore` confirms local `.env` files are not tracked.
-- **Tracked:** Zero `.env` files exist in the Git index (only `.env.example` templates are tracked).
-- **Working Tree:**
-  - Modified (unstaged): `.gitignore`, `backend/follow-the-money-api/.gitignore`, `frontend/.gitignore`.
-  - Untracked: `.env.example`, `frontend/.env.example`, `docs/repository-audit.md`, `docs/improvement-roadmap.md`, `docs/baseline-check.md`, `docs/ANTIGRAVITY-CONTINUATION.md`.
-
----
-
-## 7. Remaining Tasks in Priority Order
-1. **Remove Orphaned Directory:** Delete the unused skeleton directory `backend/prisma/`.
-2. **Local Database Startup:** Launch Docker Desktop and run `docker compose -f docker-compose.postgres.yml up -d` to verify local DB connectivity.
-3. **Fix E2E Test Exit Masking:** In `backend/follow-the-money-api/scripts/test-e2e-api.ts`, remove the unconditional `process.exit(0)` inside the `finally` block so database failures emit a non-zero exit code.
-4. **CSPRNG Verification Codes:** In `backend/follow-the-money-api/src/controllers/auth.controller.ts`, replace `Math.random()` with `crypto.randomInt(100000, 1000000)`.
-5. **Add Authentication Rate Limiting:** Introduce rate limiting on `/auth` verification and login endpoints to prevent brute-force attacks.
-6. **Documentation Alignment:** Update `README.md` to reflect the active PostgreSQL architecture instead of MySQL.
-7. **Frontend Linting Resolution:** Fix the 41 ESLint warnings/errors (notably `react-hooks/set-state-in-effect` in `Subscriptions.tsx` and explicit `any` usages).
-
----
-
-## 8. Important Safety Rules
-- **Never print, copy, or log secret values, connection strings, or API keys.**
-- **Never modify application code without explicit instructions.**
-- **Never stage or commit `.env` files.**
-- **Do not perform destructive operations on the production Supabase database.**
-- **Ensure Git index cache remains clear of sensitive files.**
-
----
-
-## 9. Next Read-Only Verification Prompt
-Copy and paste this prompt to verify the baseline in the next session:
-
-```text
-Perform a read-only verification of the MoneyTracker repository state.
-
-Do not modify, create, delete, install, commit, or push anything.
-Do not display any secret values.
-
-Check:
-1. Current git status (cleanliness of working tree, unstaged changes, untracked files).
-2. Confirm whether backend/follow-the-money-api/.env and frontend/.env exist and are ignored by Git.
-3. Confirm whether backend/.env is absent.
-4. Confirm whether backend/prisma/ still exists.
-5. Confirm that no .env files are tracked in the Git index.
-6. Verify whether Docker and local PostgreSQL on port 5432 are running and reachable.
-
-Report findings with exact file paths and statuses. Never print environment file contents.
-```
+## 10. Security & Hardening History
+Completed in previous commit `e9eaa57`:
+- Secure CSPRNG verification code generation (`crypto.randomInt`).
+- Verification codes stored as SHA-256 hashes.
+- Failed-attempt tracking with automatic invalidation after 5 failures.
+- Route-level rate limiting on sensitive auth endpoints.
+- Railway `trust proxy` configured for accurate IP rate limiting.
+- Test-mode email bypass for automated security tests.
+- Prisma migration deployment executed before backend process startup.
