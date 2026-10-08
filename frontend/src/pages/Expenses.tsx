@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeftRight,
   Download,
@@ -136,6 +136,8 @@ export default function Expenses() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editError, setEditError] = useState("");
+
+  const amountInputRef = useRef<HTMLInputElement>(null);
 
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState("");
@@ -586,7 +588,7 @@ export default function Expenses() {
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Amount</label>
-            <input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="25.00" className={inputClass} />
+            <input ref={amountInputRef} type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="25.00" className={inputClass} />
           </div>
           <div className="min-w-0 overflow-hidden">
             <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Date</label>
@@ -822,8 +824,53 @@ export default function Expenses() {
 
         {loading ? (
           <p className="mt-6 text-sm text-slate-400 dark:text-slate-500">Loading...</p>
+        ) : activityItems.length === 0 ? (
+          <div className="mt-6 rounded-3xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center dark:border-slate-800 dark:bg-slate-950/50 sm:p-12">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+              <Receipt className="h-7 w-7" aria-hidden="true" />
+            </div>
+            <h3 className="mt-4 text-lg font-bold text-slate-900 dark:text-slate-100">
+              No activity recorded yet
+            </h3>
+            <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
+              Log your daily expenses, bills, or account transactions to see your financial timeline and outflow analytics.
+            </p>
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  amountInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  amountInputRef.current?.focus();
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/40"
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Log your first expense
+              </button>
+            </div>
+          </div>
         ) : filteredActivity.length === 0 ? (
-          <p className="mt-6 text-sm text-slate-500 dark:text-slate-400">No activity matches the selected filters.</p>
+          <div className="mt-6 rounded-3xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center dark:border-slate-800 dark:bg-slate-950/50 sm:p-10">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+              <Filter className="h-6 w-6" aria-hidden="true" />
+            </div>
+            <h3 className="mt-4 text-base font-bold text-slate-900 dark:text-slate-100">
+              No activity matches your filters
+            </h3>
+            <p className="mx-auto mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">
+              Try adjusting your date range, categories, or transaction types to see more results.
+            </p>
+            <div className="mt-5">
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus:ring-slate-800"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+                Clear all filters
+              </button>
+            </div>
+          </div>
         ) : (
           <>
             <div className="mt-6 hidden overflow-x-auto lg:block">

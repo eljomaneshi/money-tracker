@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
     NotebookText,
     Plus,
@@ -82,6 +82,13 @@ export default function Notes() {
 
     const [statusFilter, setStatusFilter] = useState("");
     const [typeFilter, setTypeFilter] = useState("");
+
+    const noteTitleInputRef = useRef<HTMLInputElement>(null);
+
+    const resetFilters = () => {
+        setStatusFilter("");
+        setTypeFilter("");
+    };
 
     const fetchData = async () => {
         try {
@@ -296,6 +303,7 @@ export default function Notes() {
                             Title
                         </label>
                         <input
+                            ref={noteTitleInputRef}
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             placeholder="Pay internet bill"
@@ -499,8 +507,53 @@ export default function Notes() {
 
                 {loading ? (
                     <p className="text-sm text-slate-400 dark:text-slate-500">Loading...</p>
+                ) : notes.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center dark:border-slate-800 dark:bg-slate-950/50 sm:p-12">
+                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+                            <NotebookText className="h-7 w-7" aria-hidden="true" />
+                        </div>
+                        <h3 className="mt-4 text-lg font-bold text-slate-900 dark:text-slate-100">
+                            No notes yet
+                        </h3>
+                        <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
+                            Keep reminders, money to receive, money to pay, and financial notes organized in one place.
+                        </p>
+                        <div className="mt-6">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    noteTitleInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                                    noteTitleInputRef.current?.focus();
+                                }}
+                                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/40"
+                            >
+                                <Plus className="h-4 w-4" aria-hidden="true" />
+                                Create a note
+                            </button>
+                        </div>
+                    </div>
                 ) : filteredNotes.length === 0 ? (
-                    <p className="text-sm text-slate-500 dark:text-slate-400">No notes found.</p>
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center dark:border-slate-800 dark:bg-slate-950/50 sm:p-10">
+                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                            <NotebookText className="h-6 w-6" aria-hidden="true" />
+                        </div>
+                        <h3 className="mt-4 text-base font-bold text-slate-900 dark:text-slate-100">
+                            No notes match the selected filters
+                        </h3>
+                        <p className="mx-auto mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">
+                            No notes found with the current type or status filter.
+                        </p>
+                        <div className="mt-5">
+                            <button
+                                type="button"
+                                onClick={resetFilters}
+                                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus:ring-slate-800"
+                            >
+                                <X className="h-4 w-4" aria-hidden="true" />
+                                Reset filters
+                            </button>
+                        </div>
+                    </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                         {filteredNotes.map((note) => (

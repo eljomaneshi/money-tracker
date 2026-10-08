@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCcw, Repeat, Plus, XCircle } from "lucide-react";
 import api from "../lib/api";
 import { formatMoney } from "../utils/formatMoney";
@@ -78,6 +78,8 @@ export default function Subscriptions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const subscriptionNameInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
@@ -223,6 +225,35 @@ export default function Subscriptions() {
     }
 
     if (items.length === 0) {
+      if (showCancel && subscriptions.length === 0) {
+        return (
+          <div className="p-8 text-center sm:p-12">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+              <Repeat className="h-7 w-7" aria-hidden="true" />
+            </div>
+            <h3 className="mt-4 text-lg font-bold text-slate-900 dark:text-slate-100">
+              No subscriptions tracked yet
+            </h3>
+            <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
+              Track your recurring monthly and yearly services to forecast renewals.
+            </p>
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  subscriptionNameInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  subscriptionNameInputRef.current?.focus();
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/40"
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Add a subscription
+              </button>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="px-6 py-8 text-sm text-slate-500 dark:text-slate-400">
           {emptyText}
@@ -398,6 +429,7 @@ export default function Subscriptions() {
               Description
             </label>
             <input
+              ref={subscriptionNameInputRef}
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Netflix"
