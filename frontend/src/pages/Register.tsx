@@ -12,6 +12,27 @@ import { useNavigate, Link } from "react-router-dom";
 import api from "../lib/api";
 import AuthShell from "../components/AuthShell";
 
+function getRegisterErrorMessage(err: any, defaultFallback: string): string {
+  if (!err?.response) {
+    return "Unable to connect to the server. Please check your connection and try again.";
+  }
+
+  const status = err.response.status;
+  if (status === 429) {
+    return (
+      err.response.data?.error ||
+      err.response.data?.message ||
+      "Too many attempts. Please try again later."
+    );
+  }
+
+  if (status >= 500) {
+    return "An unexpected error occurred. Please try again.";
+  }
+
+  return err.response.data?.error || err.response.data?.message || defaultFallback;
+}
+
 export default function Register() {
   const [step, setStep] = useState<1 | 2>(1);
   const [fullName, setFullName] = useState("");
@@ -39,7 +60,7 @@ export default function Register() {
       setMessage(data?.message || "Verification code sent to your email.");
       setStep(2);
     } catch (err: any) {
-      setError(err.response?.data?.error || "Failed to send verification code");
+      setError(getRegisterErrorMessage(err, "Failed to send verification code"));
     } finally {
       setLoading(false);
     }
@@ -65,7 +86,7 @@ export default function Register() {
         },
       });
     } catch (err: any) {
-      setError(err.response?.data?.error || "Registration failed");
+      setError(getRegisterErrorMessage(err, "Registration failed"));
     } finally {
       setLoading(false);
     }
@@ -103,13 +124,21 @@ export default function Register() {
       </div>
 
       {error && (
-        <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+        >
           {error}
         </div>
       )}
 
       {message && (
-        <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+        <div
+          role="status"
+          aria-live="polite"
+          className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300"
+        >
           {message}
         </div>
       )}
@@ -216,7 +245,7 @@ export default function Register() {
           <div>
             <div className="mb-2 flex items-center justify-between gap-3">
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Password
+                Set account password
               </label>
               <button
                 type="button"
@@ -226,6 +255,9 @@ export default function Register() {
                 {showPassword ? "Hide" : "Show"}
               </button>
             </div>
+            <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+              Choose a password you will use to sign in to MoneyTracker.
+            </p>
 
             <div className="relative">
               <input

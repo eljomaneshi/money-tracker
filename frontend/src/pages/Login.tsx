@@ -26,7 +26,29 @@ export default function Login() {
       await login(email.trim().toLowerCase(), password);
       navigate("/");
     } catch (err: any) {
-      setError(err.response?.data?.message || "Login failed");
+      if (!err.response) {
+        setError(
+          "Unable to connect to the server. Please check your connection and try again."
+        );
+      } else if (err.response.status === 401) {
+        setError("Invalid email or password. Please try again.");
+      } else if (err.response.status === 429) {
+        setError(
+          err.response.data?.error ||
+            err.response.data?.message ||
+            "Too many login attempts. Please try again later."
+        );
+      } else if (err.response.status >= 500) {
+        setError(
+          "An unexpected error occurred while signing in. Please try again."
+        );
+      } else {
+        setError(
+          err.response.data?.error ||
+            err.response.data?.message ||
+            "An unexpected error occurred while signing in. Please try again."
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -40,13 +62,21 @@ export default function Login() {
       description="Access your balances, subscriptions, and spending dashboard."
     >
       {successMessage && (
-        <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+        <div
+          role="status"
+          aria-live="polite"
+          className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300"
+        >
           {successMessage}
         </div>
       )}
 
       {error && (
-        <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+        >
           {error}
         </div>
       )}
