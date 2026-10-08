@@ -1,6 +1,34 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme {
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* FinTech Obsidian & Layered Slate */
+  --color-obsidian-950: #070b14;
+  --color-obsidian-900: #0b1120;
+  --color-obsidian-850: #0f172a;
+  --color-obsidian-800: #131e35;
+  --color-obsidian-750: #192642;
+  --color-obsidian-700: #1e293b;
+
+  /* Telemetry Accents */
+  --color-mint-400: #34d399;
+  --color-mint-500: #10b981;
+  --color-mint-600: #059669;
+
+  --color-coral-400: #fb7185;
+  --color-coral-500: #f43f5e;
+  --color-coral-600: #e11d48;
+
+  /* Elevation Shadows */
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  --shadow-card-hover: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  --shadow-glow-mint: 0 0 20px -2px rgba(16, 185, 129, 0.25);
+  --shadow-glow-dark: 0 0 25px -3px rgba(0, 0, 0, 0.6);
+}
+
 *,
 *::before,
 *::after {
@@ -15,8 +43,20 @@ body,
 
 body {
   margin: 0;
+  font-family: var(--font-sans);
   background-color: #f8fafc;
   color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.dark body {
+  background-color: #070b14;
+  color: #f8fafc;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
 input,

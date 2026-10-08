@@ -12,8 +12,6 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import api from "../lib/api";
 import { formatMoney } from "../utils/formatMoney";
 
@@ -361,7 +359,11 @@ export default function Expenses() {
     return "All time";
   };
 
-  const exportPDF = () => {
+  const exportPDF = async () => {
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+      import("jspdf"),
+      import("jspdf-autotable"),
+    ]);
     const doc = new jsPDF();
     const pos = moneyPosition(mainCurrency);
     const generatedAt = new Date().toLocaleString();
