@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import type { ReactNode } from "react";
-import api, { setAuthToken } from "../lib/api";
+import { useNavigate, useLocation } from "react-router-dom";
+import api, { setAuthToken, setSessionExpiryHandler } from "../lib/api";
 
 type AuthContextType = {
   token: string | null;
@@ -13,6 +14,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const savedToken = localStorage.getItem("token");
@@ -35,11 +38,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await api.post("/auth/register", { email, password });
   };
 
-  const logout = (): void => {
+  const logout = useCallback((): void => {
     setToken(null);
     localStorage.removeItem("token");
     setAuthToken(null);
-  };
+  }, []);
+
+  useEffect(() => {
+    setSessionExpiryHandler(() => {
+      const returnPath = `${location.pathname}${location.search}${location.hash}`;
+      logout();
+      navigate("/login", {
+        replace: true,
+        state: {
+          sessionExpiredMessage: "Your session has expired. Please sign in again.",
+          from: returnPath,
+        },
+      });
+    });
+
+    return () => {
+      setSessionExpiryHandler(null);
+    };
+  }, [navigate, location, logout]);
 
   return (
     <AuthContext.Provider value={{ token, login, register, logout }}>

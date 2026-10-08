@@ -4,6 +4,30 @@ import { useAuth } from "../contexts/AuthContext";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import AuthShell from "../components/AuthShell";
 
+function sanitizeReturnPath(value: unknown): string {
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) {
+    return "/dashboard";
+  }
+
+  const pathOnly = value.split("?")[0].split("#")[0];
+  const normalizedPath = pathOnly.length > 1 ? pathOnly.replace(/\/+$/, "") : pathOnly;
+
+  const blockedPaths = [
+    "/",
+    "/login",
+    "/register",
+    "/privacy",
+    "/terms",
+    "/security",
+  ];
+
+  if (blockedPaths.includes(normalizedPath)) {
+    return "/dashboard";
+  }
+
+  return value;
+}
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,7 +39,17 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const successMessage = location.state?.successMessage as string | undefined;
+  const sessionExpiredMessage =
+    typeof location.state?.sessionExpiredMessage === "string" &&
+    location.state.sessionExpiredMessage.trim() !== ""
+      ? location.state.sessionExpiredMessage
+      : undefined;
+
+  const successMessage =
+    typeof location.state?.successMessage === "string" &&
+    location.state.successMessage.trim() !== ""
+      ? location.state.successMessage
+      : undefined;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +58,7 @@ export default function Login() {
 
     try {
       await login(email.trim().toLowerCase(), password);
-      navigate("/");
+      navigate(sanitizeReturnPath(location.state?.from), { replace: true });
     } catch (err: any) {
       if (!err.response) {
         setError(
@@ -61,17 +95,7 @@ export default function Login() {
       title="Sign in to Money Tracker"
       description="Access your balances, subscriptions, and spending dashboard."
     >
-      {successMessage && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300"
-        >
-          {successMessage}
-        </div>
-      )}
-
-      {error && (
+      {error ? (
         <div
           role="alert"
           aria-live="assertive"
@@ -79,7 +103,23 @@ export default function Login() {
         >
           {error}
         </div>
-      )}
+      ) : sessionExpiredMessage ? (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300"
+        >
+          {sessionExpiredMessage}
+        </div>
+      ) : successMessage ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300"
+        >
+          {successMessage}
+        </div>
+      ) : null}
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
