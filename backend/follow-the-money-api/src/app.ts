@@ -8,6 +8,7 @@ import accountRoutes from "./routes/account.routes";
 import { startSubscriptionCron } from "./cron/subscriptionCron";
 import noteRoutes from "./routes/note.routes";
 import accountActionRoutes from "./routes/accountAction.routes";
+import prisma from "./prisma";
 
 const app = express();
 
@@ -53,11 +54,32 @@ app.use("/accounts", accountRoutes);
 app.use("/notes", noteRoutes);
 app.use("/account-actions", accountActionRoutes);
 
-app.get("/health", (_req: Request, res: Response) => {
-    res.status(200).json({
-        status: "ok",
-        message: "Express + Prisma + PostgreSQL ready",
-    });
+app.get("/health", async (_req: Request, res: Response) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    let timer: NodeJS.Timeout | undefined;
+
+    try {
+        const timeoutPromise = new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error("Database ping timed out")), 3000);
+        });
+
+        await Promise.race([prisma.$queryRaw`SELECT 1`, timeoutPromise]);
+        clearTimeout(timer);
+
+        return res.status(200).json({
+            status: "ok",
+            message: "Express + Prisma + PostgreSQL ready",
+            database: "connected",
+        });
+    } catch (error) {
+        if (timer) clearTimeout(timer);
+        console.error("Health check database failure:", error);
+        return res.status(503).json({
+            status: "error",
+            message: "Database connectivity check failed",
+            database: "disconnected",
+        });
+    }
 });
 
 app.use(
