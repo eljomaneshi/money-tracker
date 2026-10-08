@@ -1,9 +1,9 @@
-# Current Continuation State — 2026-10-08
+# Current Continuation State — 2026-10-09
 
 ## 1. Repository & Git State
 - **Repository:** `eljomaneshi/money-tracker`
 - **Branch:** `main`
-- **Latest pushed commit:** `4064fe0 feat(api): verify database connectivity in /health endpoint`
+- **Latest pushed commit:** `87f176d feat(settings): add opt-in privacy-preserving Claude financial insights`
 - **Local branch state:** Synchronized with `origin/main`.
 - **Working tree:** Clean (except unstaged `docs/ANTIGRAVITY-CONTINUATION.md`).
 - **Rule:** Do not deploy without explicit later approval.
@@ -219,6 +219,37 @@ Task 10 was implemented, reviewed locally, verified with clean builds, committed
 - Confirmed only `backend/follow-the-money-api/src/app.ts` was included in commit `4064fe0`.
 - Task 10 was committed as `4064fe0` and pushed to `origin/main`.
 
+### Commit 87f176d — Opt-In, Privacy-Preserving Claude Financial Insights (Task 11)
+Task 11 was implemented, reviewed locally, verified with clean builds, committed, and pushed to `main`.
+**Files changed in commit `87f176d`:**
+- `backend/follow-the-money-api/src/services/aiSanitizer.service.ts` (new)
+- `backend/follow-the-money-api/src/controllers/aiInsightsController.ts` (new)
+- `backend/follow-the-money-api/src/routes/aiInsightsRoutes.ts` (new)
+- `frontend/src/pages/Settings.tsx` (modified)
+
+**Delivered behavior:**
+- **Zero-PII Aggregate Sanitization Service:** `computeUserAggregateMetrics(userId)` in `aiSanitizer.service.ts` extracts strictly minimized numeric aggregates scoped to the authenticated user ID: 30-day grouped category spending totals, top 5 spending categories with percentage shares, active subscription count, and normalized monthly subscription commitment. Completely omits descriptions, notes, account names, payees/merchants, or profile info at the database query level.
+- **Preview Endpoint (`GET /me/ai-insights/preview`):** Returns the exact sanitized JSON aggregate metrics object so users can inspect precisely what would be evaluated before opting in.
+- **Strict Opt-In Enforced (`POST /me/ai-insights/generate`):** Requires explicit `optInConfirmed === true` in the request body; returns HTTP 403 Forbidden (`{ error: "AI insights feature requires explicit opt-in consent." }`) if consent is omitted or false.
+- **Native Claude API Integration:** Uses Node native `fetch` to Anthropic (`https://api.anthropic.com/v1/messages`), transmitting strictly `JSON.stringify(metrics, null, 2)` (numeric aggregates only).
+- **Graceful Unconfigured Fallback:** Returns HTTP 501 Not Implemented (`{ error: "Claude AI service is not configured. ANTHROPIC_API_KEY is not set on this server.", configured: false }`) if `ANTHROPIC_API_KEY` is not present in the runtime environment.
+- **Strict Rate Limiting & Anti-Caching:** Added `aiLimiter` in `aiInsightsController.ts` enforcing a 10 requests per hour per IP cap. Endpoints set `Cache-Control: no-store, no-cache, must-revalidate, private` to prevent intermediate caching.
+- **Settings UI Integration:** Added an "AI Insights (Optional)" card in `Settings.tsx` below Data Portability & Export:
+  - Toggle defaults to OFF (`false`), scoped to the user email in `localStorage`.
+  - Plain-language privacy summary explicitly contrasts what Claude sees vs what Claude never sees.
+  - "Preview data" modal renders the exact formatted JSON payload for full user transparency.
+  - "Generate insights" action button with loading states (`Analyzing aggregates...`), dismissible summary observations, and error handling for 429 rate limits and 501 unconfigured states.
+  - "Revoke consent" instant action immediately deletes local consent, clears cached summaries, and closes open modals.
+  - Fully accessible with ARIA live feedback banners (`role="status"` / `role="alert"`).
+
+**Verification performed:**
+- `npm run build` in `backend/follow-the-money-api` (`tsc`) passed with exit code 0.
+- `npm run build` in `frontend` (`tsc -b && vite build`) passed with exit code 0.
+- `git diff --check` passed with 0 errors or whitespace issues.
+- `git diff --stat`: `4 files changed, 510 insertions(+)`.
+- Confirmed only the four approved files were included in commit `87f176d`.
+- Task 11 was committed as `87f176d` and pushed to `origin/main`.
+
 ---
 
 ## 3. Local Development Verified
@@ -248,6 +279,7 @@ The local development environment has been tested and verified operational:
   - Request code limiter enforces 5 requests per 15 minutes per IP (`requestCodeLimiter`).
   - Submit code limiter enforces 10 requests per 15 minutes per IP (`submitCodeLimiter`).
   - Export limiter enforces 5 requests per 15 minutes per IP (`exportLimiter`).
+  - AI insights limiter enforces 10 requests per hour per IP (`aiLimiter`).
   - Local browser sessions share localhost IP behavior.
   - Rate limit counters reside in-memory; restarting only the local backend process clears local counters.
   - Do not weaken or disable rate limiting in production.
@@ -269,23 +301,23 @@ The local development environment has been tested and verified operational:
 8. Modernize README from MySQL to PostgreSQL, Supabase, and Railway architecture (`a28653b`).
 9. Safe personal data export in JSON and CSV formats (`e27c6d0`).
 10. Database connectivity verification in `/health` endpoint (`4064fe0`).
+11. Opt-in, privacy-preserving Claude feature using minimized aggregate data only (`87f176d`).
 
 ### Next Planned Task (Not Yet Approved or Implemented):
-11. **Evaluate an opt-in, privacy-preserving Claude feature using minimized aggregate data only:**
-   - Audit existing application architecture, privacy policy commitments, and candidate data points for potential AI assistance.
-   - Ensure strict opt-in consent model, complete user control, and total omission of PII or raw transaction narratives.
-   - Boundaries: Read-only audit and plan first; do not add API keys, external SDKs, or background calls without explicit user approval.
+12. **Only after product improvements are complete, prepare truthful Claude Startup application materials:**
+   - Review existing project achievements, verified architectural transitions (PostgreSQL, Supabase, Railway, Resend, Docker, privacy-preserving Claude insights), and draft truthful, grounded application responses.
+   - Boundaries: Read-only audit and plan first; do not invent fictional metrics, false user numbers, or unverified claims; await explicit user approval before authoring documents.
 
 ### Future Tasks (One at a Time):
-12. Only after product improvements are complete, prepare truthful Claude Startup application materials.
+- None currently planned — all 12 roadmap items will be fulfilled once Task 12 is completed.
 
 ---
 
-## 6. Next-Task Boundaries
-- Must begin with a read-only audit and plan before writing any code or making any architectural changes.
-- Must wait for explicit user approval before modifying or creating any files.
-- Must enforce strict user privacy, explicit opt-in mechanics, and minimize all data payloads to aggregate statistics only.
-- Must not alter database schema, migrations, dependencies, deployment settings, or secret files.
+## 6. Next-Task Boundaries (Task 12)
+- Must begin with a read-only audit of existing application capabilities, architecture documentation, and roadmap milestones before preparing any application drafts.
+- Must wait for explicit user approval before authoring or modifying any files.
+- Must ground all statements in verified factual details from the repository (honest valuation, real features, verified privacy model).
+- Must not alter application code, database schema, migrations, dependencies, deployment settings, or secret files.
 
 ---
 
