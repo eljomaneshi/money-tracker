@@ -3,14 +3,17 @@ import {
   AlertTriangle,
   Bell,
   Download,
+  Eye,
   FileJson,
   FileSpreadsheet,
   Mail,
   Save,
   Settings as SettingsIcon,
   ShieldCheck,
+  Sparkles,
   User,
   WalletCards,
+  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
@@ -77,6 +80,15 @@ export default function Settings() {
   const [exportError, setExportError] = useState("");
   const [exportSuccess, setExportSuccess] = useState("");
 
+  const [aiOptIn, setAiOptIn] = useState(false);
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [isLoadingAiPreview, setIsLoadingAiPreview] = useState(false);
+  const [aiSummary, setAiSummary] = useState("");
+  const [aiError, setAiError] = useState("");
+  const [aiSuccess, setAiSuccess] = useState("");
+  const [aiPreviewData, setAiPreviewData] = useState<any | null>(null);
+  const [showAiPreviewModal, setShowAiPreviewModal] = useState(false);
+
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -93,6 +105,9 @@ export default function Settings() {
         setSubscriptionReminderEmails(data.notifySubscriptionReminder);
         setSubscriptionCreatedEmail(data.notifySubscriptionCreated);
         setSubscriptionCancelledEmail(data.notifySubscriptionCancelled);
+
+        const savedOptIn = localStorage.getItem(`moneytracker_ai_insights_opt_in_${data.email}`);
+        setAiOptIn(savedOptIn === "true");
       } catch (error: any) {
         setAccountError(
           error?.response?.data?.error || "Failed to load settings."
@@ -359,6 +374,90 @@ export default function Settings() {
       } else {
         setIsExportingCsv(false);
       }
+    }
+  };
+
+  const handleToggleAiOptIn = (enabled: boolean) => {
+    setAiError("");
+    setAiSuccess("");
+    const key = `moneytracker_ai_insights_opt_in_${currentEmail}`;
+    if (enabled) {
+      setAiOptIn(true);
+      if (currentEmail) {
+        localStorage.setItem(key, "true");
+      }
+      setAiSuccess("AI insights enabled. You can generate spending summaries or review data anytime.");
+    } else {
+      setAiOptIn(false);
+      if (currentEmail) {
+        localStorage.removeItem(key);
+      }
+      setAiSummary("");
+      setAiPreviewData(null);
+      setShowAiPreviewModal(false);
+      setAiSuccess("AI insights disabled. All cached summaries cleared.");
+    }
+  };
+
+  const handlePreviewAiData = async () => {
+    setAiError("");
+    setIsLoadingAiPreview(true);
+    try {
+      const response = await api.get("/users/me/ai-insights/preview");
+      setAiPreviewData(response.data?.metrics || response.data);
+      setShowAiPreviewModal(true);
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        setAiPreviewData({
+          currency: mainCurrency || "EUR",
+          monthlyTotal: 0,
+          topCategories: [],
+          activeSubscriptionsCount: 0,
+          subscriptionMonthlyTotal: 0,
+          notice: "Sample schema: only numeric aggregates are transmitted.",
+        });
+        setShowAiPreviewModal(true);
+      } else {
+        setAiError(
+          err?.response?.data?.error ||
+            "Failed to load data preview. Please check your connection and try again."
+        );
+      }
+    } finally {
+      setIsLoadingAiPreview(false);
+    }
+  };
+
+  const handleGenerateAiInsights = async () => {
+    if (!aiOptIn) {
+      setAiError("Please enable the AI Insights feature before generating summaries.");
+      return;
+    }
+    setAiError("");
+    setAiSuccess("");
+    setIsGeneratingAi(true);
+    try {
+      const response = await api.post("/users/me/ai-insights/generate", {
+        optInConfirmed: true,
+      });
+      setAiSummary(response.data?.summary || "No insights returned.");
+      setAiSuccess("AI financial insight generated successfully.");
+    } catch (err: any) {
+      if (err?.response?.status === 429) {
+        setAiError("Too many analysis requests. Please try again later.");
+      } else if (err?.response?.status === 501) {
+        setAiError(
+          err?.response?.data?.error ||
+            "Claude AI service is not configured on this server."
+        );
+      } else {
+        setAiError(
+          err?.response?.data?.error ||
+            "Failed to generate AI insights. Please check your connection and try again."
+        );
+      }
+    } finally {
+      setIsGeneratingAi(false);
     }
   };
 
@@ -936,6 +1035,184 @@ export default function Settings() {
               </div>
             </div>
           </div>
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
+          <div className="mb-6 flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="rounded-2xl bg-violet-100 p-2.5 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                    AI Insights (Optional)
+                  </h2>
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      aiOptIn
+                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                        : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                    }`}
+                  >
+                    {aiOptIn ? "Opted In" : "Disabled"}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  Optional, privacy-preserving monthly spending summaries powered by Claude.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleToggleAiOptIn(!aiOptIn)}
+              aria-pressed={aiOptIn}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 ${
+                aiOptIn ? "bg-violet-600" : "bg-slate-300 dark:bg-slate-700"
+              }`}
+            >
+              <span className="sr-only">Toggle AI Insights</span>
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  aiOptIn ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+
+          {aiSuccess && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300"
+            >
+              {aiSuccess}
+            </div>
+          )}
+
+          {aiError && (
+            <div
+              role="alert"
+              aria-live="assertive"
+              className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+            >
+              {aiError}
+            </div>
+          )}
+
+          <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              Privacy & Data Guarantees
+            </h3>
+            <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+              <div className="flex items-start gap-2 text-slate-600 dark:text-slate-300">
+                <span className="mt-0.5 font-bold text-emerald-600 dark:text-emerald-400">✔</span>
+                <span>
+                  <strong>What Claude sees:</strong> High-level numeric aggregates only (total 30-day spend, category percentages, subscription count).
+                </span>
+              </div>
+              <div className="flex items-start gap-2 text-slate-600 dark:text-slate-300">
+                <span className="mt-0.5 font-bold text-rose-600 dark:text-rose-400">✖</span>
+                <span>
+                  <strong>What Claude NEVER sees:</strong> Your name, email, specific purchase descriptions, merchants, bank names, or notes.
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handlePreviewAiData}
+              disabled={isLoadingAiPreview}
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:focus:ring-slate-800"
+            >
+              <Eye className="h-4 w-4 text-slate-500" />
+              <span>{isLoadingAiPreview ? "Loading preview..." : "Preview data"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleGenerateAiInsights}
+              disabled={!aiOptIn || isGeneratingAi}
+              className="inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700 focus:outline-none focus:ring-4 focus:ring-violet-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-violet-600 dark:hover:bg-violet-700 dark:focus:ring-violet-900/40"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>{isGeneratingAi ? "Analyzing aggregates..." : "Generate insights"}</span>
+            </button>
+
+            {aiOptIn && (
+              <button
+                type="button"
+                onClick={() => handleToggleAiOptIn(false)}
+                className="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300 dark:hover:bg-rose-950/50"
+              >
+                Revoke consent
+              </button>
+            )}
+          </div>
+
+          {aiSummary && (
+            <div className="mt-6 rounded-2xl border border-violet-200 bg-violet-50/70 p-5 dark:border-violet-900/40 dark:bg-violet-950/30">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 font-semibold text-violet-900 dark:text-violet-200">
+                  <Sparkles className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                  <span>Claude Spending Observations</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAiSummary("")}
+                  className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  Dismiss
+                </button>
+              </div>
+              <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+                {aiSummary}
+              </p>
+            </div>
+          )}
+
+          {showAiPreviewModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+              <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 sm:p-8">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                      Sanitized Data Preview
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      This is the exact JSON payload evaluated for insights. Notice that descriptions, personal notes, and account identities are completely absent.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAiPreviewModal(false)}
+                    className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div className="mt-4 max-h-72 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
+                  <pre className="font-mono text-xs text-slate-800 dark:text-slate-200">
+                    {JSON.stringify(aiPreviewData, null, 2)}
+                  </pre>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowAiPreviewModal(false)}
+                    className="rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="rounded-3xl border border-rose-200 bg-white p-6 shadow-sm dark:border-rose-900/40 dark:bg-slate-900 sm:p-8">
