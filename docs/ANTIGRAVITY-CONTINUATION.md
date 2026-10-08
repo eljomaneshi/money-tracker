@@ -3,10 +3,9 @@
 ## 1. Repository & Git State
 - **Repository:** `eljomaneshi/money-tracker`
 - **Branch:** `main`
-- **Latest pushed commit:** `7289d83 feat(ui): add actionable empty states across primary views`
+- **Latest pushed commit:** `67af4ce feat(auth): handle expired sessions via global 401 axios interceptor`
 - **Local branch state:** Synchronized with `origin/main`.
 - **Working tree:** Clean (except unstaged `docs/ANTIGRAVITY-CONTINUATION.md`).
-- **Deployment state:** Commits `3bad3ce`, `8ab1bab`, `95fd76f`, and `7289d83` have not been deployed to production.
 - **Rule:** Do not deploy without explicit later approval.
 
 ---
@@ -106,6 +105,28 @@ Task 5 was implemented, verified, committed, and pushed to `main`.
 - `git diff --check` passed with 0 errors or whitespace issues.
 - Task 5 was committed as `7289d83` and pushed to `origin/main`.
 
+### Commit 67af4ce — Global 401 Session-Expiry Handling (Task 6)
+Task 6 was implemented, verified, committed, and pushed to `main`.
+**Files changed in commit `67af4ce`:**
+- `frontend/src/lib/api.ts`
+- `frontend/src/contexts/AuthContext.tsx`
+- `frontend/src/pages/Login.tsx`
+
+**Delivered behavior:**
+- **Module-level response interceptor:** Registered a singleton Axios response interceptor that always returns `Promise.reject(error)` on error, never swallowing errors, retrying, or leaving requests unresolved.
+- **Strict 401 qualification:** Treats errors as session expiry only when status is 401, URL is not `/auth/login`, and an `Authorization` header or stored token is present. Unauthenticated public requests (e.g. registration) reject to their page handlers without triggering expiry.
+- **Concurrent burst duplicate protection:** First qualifying 401 sets module lock `isHandlingSessionExpiry`, clears stored token via `setAuthToken(null)`, schedules a 1500 ms defensive reset timeout, invokes the registered session-expiry handler once, and rejects the original request. Subsequent concurrent 401s reject immediately without duplicate token clearance or navigation.
+- **Lock reset:** Resets lock immediately upon successful login when `setAuthToken(token)` receives a non-null token (clearing any pending timeout), and independently via the 1500 ms defensive timeout.
+- **Router-context handler registration:** `AuthProvider` uses `useNavigate` and `useLocation` to register a session-expiry callback that captures the current internal path (`${location.pathname}${location.search}${location.hash}`), calls `logout()`, and navigates with `replace: true` to `/login` passing state with `sessionExpiredMessage` and `from`. Unregisters on unmount/re-render.
+- **Safe return path sanitization:** `Login.tsx` implements local `sanitizeReturnPath` helper rejecting non-strings, protocol-relative paths (`//`), `/`, `/login`, `/register`, `/privacy`, `/terms`, and `/security`, safely defaulting to `/dashboard` while preserving valid query parameters and hash anchors.
+- **Accessible banner precedence:** In `Login.tsx`, alert rendering prioritizes: 1. login `error` banner > 2. amber `sessionExpiredMessage` banner (`role="alert"`, `aria-live="assertive"`) > 3. `successMessage` banner. A failed login replaces the session-expired notice with the invalid-credentials error.
+
+**Verification performed:**
+- `npm run build` (`tsc -b && vite build`) passed with exit code 0.
+- `git diff --check` passed with 0 errors or whitespace issues.
+- Zero lint errors or warnings were introduced by Task 6.
+- Task 6 was committed as `67af4ce` and pushed to `origin/main`.
+
 *No backend, database, Prisma schema, migration, package dependency, Docker, deployment, or `.env` files were modified.*
 
 ---
@@ -152,16 +173,14 @@ The local development environment has been tested and verified operational:
 3. Frontend Authentication UX Improvements (`8ab1bab`).
 4. First-time user onboarding checklist on Dashboard (`95fd76f`).
 5. Actionable empty states for Balances, Activity, Subscriptions, and Notes (`7289d83`).
+6. Safe frontend session-expiry handling via global 401 Axios interceptor (`67af4ce`).
 
 ### Next Planned Task (Not Yet Approved or Implemented):
-6. **Safe frontend session-expiry handling (via global 401 Axios interceptor):**
-   - Implement a safe, global response interceptor in the Axios client configuration (`frontend/src/lib/api.ts`).
-   - Automatically handle 401 Unauthorized errors caused by expired JWT sessions without crashing or hanging requests.
-   - Clear authentication state, remove stale session tokens, and transition user to login with appropriate feedback.
-   - Boundaries: Frontend-only, begin with a read-only audit and plan, and wait for explicit approval before modifying any files.
+7. **Visible user feedback/contact path (`founder@moneytracker.online`):**
+   - Provide a clear, accessible feedback/contact mechanism or link to `founder@moneytracker.online`.
+   - Boundaries: Frontend/UI-only, begin with a read-only audit and plan, and wait for explicit approval before modifying any files.
 
 ### Future Tasks (One at a Time):
-7. Visible user feedback/contact path (`founder@moneytracker.online`).
 8. Modernize README and documentation from outdated MySQL references to current PostgreSQL / Supabase / Railway architecture.
 9. Evaluate safe personal data export (JSON / CSV).
 10. Improve `/health` endpoint to verify database connectivity.
@@ -171,9 +190,9 @@ The local development environment has been tested and verified operational:
 ---
 
 ## 6. Next-Task Boundaries
-- Must begin with a read-only audit and plan of existing session-handling, token storage, and Axios interceptor setup before making changes.
+- Must begin with a read-only audit and plan of existing UI layout, navigation, footers, or settings for placing the feedback/contact path before making changes.
 - Must wait for explicit user approval before modifying any files.
-- Must be frontend-only and focused on safe session-expiry handling.
+- Must be frontend-only and focused on the visible user feedback/contact mechanism (`founder@moneytracker.online`).
 - Must not alter backend logic, database behavior, migrations, dependencies, deployment, or environment files.
 
 ---
