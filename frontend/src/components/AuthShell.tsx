@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { ChartNoAxesCombined, Lock, WalletCards } from "lucide-react";
 
 type AuthShellProps = {
@@ -35,11 +36,13 @@ export default function AuthShell({
 
           <div className="relative flex min-h-screen w-full flex-col px-10 py-10 xl:px-14 xl:py-12">
             <div className="flex justify-start">
-              <img
-                src="/logo.png"
-                alt="Money Tracker logo"
-                className="h-20 w-20 rounded-2xl object-contain xl:h-24 xl:w-24"
-              />
+              <Link to="/" className="transition hover:opacity-85" title="Money Tracker">
+                <img
+                  src="/logo.png"
+                  alt="Money Tracker logo"
+                  className="h-20 w-20 rounded-2xl object-contain xl:h-24 xl:w-24"
+                />
+              </Link>
             </div>
 
             <div className="flex flex-1 items-center">
@@ -89,11 +92,13 @@ export default function AuthShell({
         <section className="flex items-center justify-center px-4 py-10 sm:px-6 lg:px-8 xl:px-10">
           <div className="w-full max-w-md">
             <div className="mb-10 flex justify-center lg:hidden">
-              <img
-                src="/logo.png"
-                alt="Money Tracker logo"
-                className="h-24 w-24 rounded-3xl object-contain sm:h-28 sm:w-28"
-              />
+              <Link to="/" className="transition hover:opacity-85" title="Money Tracker">
+                <img
+                  src="/logo.png"
+                  alt="Money Tracker logo"
+                  className="h-24 w-24 rounded-3xl object-contain sm:h-28 sm:w-28"
+                />
+              </Link>
             </div>
 
             <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20 sm:p-8">

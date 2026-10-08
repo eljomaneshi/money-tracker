@@ -10,11 +10,19 @@ import Balance from "./pages/Balance";
 import Settings from "./pages/Settings";
 import Notes from "./pages/Notes";
 
+import Landing from "./pages/Landing";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
+import Security from "./pages/Security";
+
 function App() {
   const { token } = useAuth();
 
   return token ? (
     <Routes>
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/security" element={<Security />} />
       <Route element={<Layout />}>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
@@ -30,9 +38,13 @@ function App() {
     </Routes>
   ) : (
     <Routes>
+      <Route path="/" element={<Landing />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/security" element={<Security />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
