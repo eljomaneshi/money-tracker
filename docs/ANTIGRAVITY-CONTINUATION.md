@@ -3,7 +3,7 @@
 ## 1. Repository & Git State
 - **Repository:** `eljomaneshi/money-tracker`
 - **Branch:** `main`
-- **Latest pushed commit:** `ae9b1b0 feat(ui): add visible feedback and founder contact links`
+- **Latest pushed commit:** `a28653b docs: modernize README from MySQL to PostgreSQL, Supabase, and Railway architecture`
 - **Local branch state:** Synchronized with `origin/main`.
 - **Working tree:** Clean (except unstaged `docs/ANTIGRAVITY-CONTINUATION.md`).
 - **Rule:** Do not deploy without explicit later approval.
@@ -145,7 +145,30 @@ Task 7 was implemented, verified, committed, and pushed to `main`.
 - Confirmed only the two approved frontend files were included in commit `ae9b1b0`.
 - Task 7 was committed as `ae9b1b0` and pushed to `origin/main`.
 
-*No backend, database, Prisma schema, migration, package dependency, Docker, deployment, or `.env` files were modified.*
+### Commit a28653b — Modernize README to PostgreSQL, Supabase, and Railway Architecture (Task 8)
+Task 8 was implemented, verified, committed, and pushed to `main`.
+**Files changed in commit `a28653b`:**
+- `README.md`
+
+**Delivered behavior:**
+- **Title and Subtitle:** Replaced legacy "MySQL" reference with "PostgreSQL (Supabase / Docker)".
+- **Overview:** Updated stack description to PostgreSQL; clearly distinguished production hosting (Express API on Railway connected to managed PostgreSQL on Supabase) from local development (local PostgreSQL container via Docker Compose).
+- **Tech Stack Table:** Updated Database row to "PostgreSQL (Supabase in production, Docker in local dev)" and Deployment row to "Railway (API), Supabase (PostgreSQL)".
+- **Project Structure Tree:** Added `docker-compose.postgres.yml`, `.env.example`, `frontend/.env.example`, and the `docs/` architecture & historical migration manuals.
+- **Prerequisites:** Removed outdated MySQL requirement; specified Docker & Docker Compose (or local PostgreSQL 16+) and Node.js v18+.
+- **Step-by-Step Local Setup:** Added explicit instructions for copying both `.env.example` files, starting local PostgreSQL via `docker compose -f docker-compose.postgres.yml up -d`, and deploying Prisma migrations via `npx prisma migrate deploy` prior to running the backend API (port 4000) and frontend client (port 5173).
+- **Environment Variables Documentation:** Updated backend default port to `PORT=4000`, provided accurate PostgreSQL connection examples (`DATABASE_URL`, `DIRECT_URL`) for both local Docker and Supabase production reference format, and documented frontend `VITE_API_URL=http://localhost:4000`.
+- **Database & Prisma Section:** Documented PostgreSQL provider, Supabase connection pooling (port 6543 via PgBouncer for application queries, direct session port 5432 for migrations), and the `npm run db:validate` validation script.
+- **Deployment Architecture:** Documented the decoupled production infrastructure (Railway hosting the Express API running `npm start` which deploys migrations before launching the web server, and Supabase hosting PostgreSQL). Documented all required Railway production variables (`DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM`, `FRONTEND_URL`, `PORT`, `NODE_ENV`).
+- **Asset Integrity:** Preserved all 10 screenshot references (`screenshots/*.png`) and relative documentation links without alteration.
+
+**Verification performed:**
+- `git diff --check` passed with 0 errors or whitespace issues.
+- `git diff --stat`: `1 file changed, 139 insertions(+), 86 deletions(-)`.
+- Confirmed only `README.md` was modified in commit `a28653b`.
+- Task 8 was committed as `a28653b` and pushed to `origin/main`.
+
+*No application code, database schemas, migrations, package dependencies, Docker containers, deployment configs, or `.env` files were modified.*
 
 ---
 
@@ -193,14 +216,15 @@ The local development environment has been tested and verified operational:
 5. Actionable empty states for Balances, Activity, Subscriptions, and Notes (`7289d83`).
 6. Safe frontend session-expiry handling via global 401 Axios interceptor (`67af4ce`).
 7. Visible user feedback/contact path (`founder@moneytracker.online`) (`ae9b1b0`).
+8. Modernize README from MySQL to PostgreSQL, Supabase, and Railway architecture (`a28653b`).
 
 ### Next Planned Task (Not Yet Approved or Implemented):
-8. **Modernize README and documentation from outdated MySQL references to current PostgreSQL / Supabase / Railway architecture:**
-   - Audit and update `README.md` and repository documentation to accurately reflect active PostgreSQL / Prisma / Supabase / Railway setup.
-   - Boundaries: Documentation-only, begin with a read-only audit and plan, and wait for explicit approval before modifying any files.
+9. **Evaluate safe personal data export (JSON / CSV):**
+   - Audit existing data structures and export capabilities (e.g. Activity / CSV exports).
+   - Plan comprehensive, privacy-preserving personal data export for user accounts, transactions, subscriptions, and notes.
+   - Boundaries: Read-only audit and plan first, ensure strict user-ownership scoping and secure download handling, and wait for explicit approval before implementing.
 
 ### Future Tasks (One at a Time):
-9. Evaluate safe personal data export (JSON / CSV).
 10. Improve `/health` endpoint to verify database connectivity.
 11. Only later evaluate an opt-in, privacy-preserving Claude feature using minimized aggregate data only.
 12. Only after product improvements are complete, prepare truthful Claude Startup application materials.
@@ -208,10 +232,10 @@ The local development environment has been tested and verified operational:
 ---
 
 ## 6. Next-Task Boundaries
-- Must begin with a read-only audit and plan of existing repository documentation (including `README.md`, any setup guides, and doc references) to identify outdated MySQL or obsolete architectural notes before making changes.
-- Must wait for explicit user approval before modifying any files.
-- Must be documentation-only, focusing strictly on reflecting the verified PostgreSQL, Prisma, Supabase, and Railway architecture.
-- Must not alter application code, database schema, migrations, dependencies, deployment settings, or secret files.
+- Must begin with a read-only audit and plan of existing data models, controllers, and export mechanisms before writing any code.
+- Must wait for explicit user approval before modifying or creating any files.
+- Must enforce strict user-level authentication and ownership scoping (`userId`), ensuring users can only export their own records.
+- Must not alter database schema, migrations, dependencies, deployment settings, or secret files.
 
 ---
 
