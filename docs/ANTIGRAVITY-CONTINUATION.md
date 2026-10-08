@@ -3,10 +3,10 @@
 ## 1. Repository & Git State
 - **Repository:** `eljomaneshi/money-tracker`
 - **Branch:** `main`
-- **Latest pushed commit:** `8ab1bab feat(auth): improve login and register error UX and accessibility`
+- **Latest pushed commit:** `95fd76f feat(dashboard): add first-time user onboarding checklist`
 - **Local branch state:** Synchronized with `origin/main`.
 - **Working tree:** Clean (except unstaged `docs/ANTIGRAVITY-CONTINUATION.md`).
-- **Deployment state:** Commits `3bad3ce` and `8ab1bab` have not been deployed to production.
+- **Deployment state:** Commits `3bad3ce`, `8ab1bab`, and `95fd76f` have not been deployed to production.
 - **Rule:** Do not deploy without explicit later approval.
 
 ---
@@ -54,6 +54,30 @@ Task 3 was implemented, verified, committed, and pushed to `main`.
 - `git diff --check` passed with 0 errors or whitespace issues.
 - Confirmed only the two approved frontend files were modified in commit `8ab1bab`.
 
+### Commit 95fd76f — First-Time User Onboarding Checklist on Dashboard (Task 4)
+Task 4 was implemented, verified, committed, and pushed to `main`.
+**Files changed in commit `95fd76f`:**
+- `frontend/src/components/OnboardingChecklist.tsx` (new)
+- `frontend/src/pages/Dashboard.tsx` (modified)
+
+**Delivered behavior:**
+- **Loading-state guard:** Checklist is hidden while Dashboard data is being fetched (`loading === true`).
+- **Live-derived completion:** Step completion is dynamically derived from live data (`accountsCount > 0`, `expensesCount > 0`, `subscriptionsCount > 0`). No artificial completion flags or duplicate database records are stored.
+- **Three actionable steps:**
+  1. "Add an initial balance or account" linking to `/balances`
+  2. "Record your first expense" linking to `/activity`
+  3. "Track a recurring subscription" linking to `/subscriptions`
+- **Accessible progress tracking:** Visual progress bar paired with `role="progressbar"`, `aria-valuemin={0}`, `aria-valuemax={3}`, `aria-valuenow={completedCount}`, and dynamic `aria-valuetext`.
+- **Automatic collapse/hiding:** The checklist automatically hides from view once all 3 onboarding steps are completed (`allCompleted === true`).
+- **User-scoped local dismissal:** Dismissal choice is stored in `localStorage` scoped strictly to the authenticated user's email (`moneytracker_onboarding_dismissed_${userEmail}`). No global fallback key is created when email is absent.
+- **Cross-device completion:** While dismissal is device-local, task completion is server-backed and thus universal across all browsers and devices.
+- **Preserved existing dashboard:** Sits cleanly between Dashboard header and Total Balance card without altering any existing widgets, cards, charts, calculations, or responsive styles.
+
+**Verification performed:**
+- `npm run build` (`tsc -b && vite build`) passed with exit code 0.
+- `git diff --check` passed with 0 errors or whitespace issues.
+- Task 4 was committed as `95fd76f` and pushed to `origin/main`.
+
 *No backend, database, Prisma schema, migration, package dependency, Docker, deployment, or `.env` files were modified.*
 
 ---
@@ -98,17 +122,16 @@ The local development environment has been tested and verified operational:
 1. Public landing page (`/`).
 2. Public Privacy, Terms, and Security trust pages (`/privacy`, `/terms`, `/security`).
 3. Frontend Authentication UX Improvements (`8ab1bab`).
+4. First-time user onboarding checklist on Dashboard (`95fd76f`).
 
 ### Next Planned Task (Not Yet Approved or Implemented):
-4. **First-time user onboarding checklist on Dashboard:**
-   - Display a guided onboarding checklist for new users on the Dashboard.
-   - Guide users through initial setup actions (e.g. adding initial balance/account, recording first activity, tracking a subscription).
-   - Ensure the checklist is dismissible or hides once tasks are completed.
-   - Maintain existing authenticated dashboard widgets and layouts.
-   - No backend, database, package, migration, or deployment changes.
+5. **Actionable empty states for Balances, Activity, Subscriptions, and Notes:**
+   - Design and implement clear, actionable empty states across primary views when no data exists.
+   - Provide direct call-to-action buttons (e.g. "Add your first account", "Log your first expense", "Add a subscription", "Create a note").
+   - Maintain existing full-data views, search, filter, and table layouts when items are present.
+   - Boundaries: Frontend-only, begin with a read-only audit and plan, and wait for explicit approval before modifying any files.
 
 ### Future Tasks (One at a Time):
-5. Actionable empty states for Balances, Activity, Subscriptions, and Notes.
 6. Safe frontend session-expiry handling (via global 401 Axios interceptor).
 7. Visible user feedback/contact path (`founder@moneytracker.online`).
 8. Modernize README and documentation from outdated MySQL references to current PostgreSQL / Supabase / Railway architecture.
@@ -120,9 +143,9 @@ The local development environment has been tested and verified operational:
 ---
 
 ## 6. Next-Task Boundaries
-- Must begin with a read-only audit and plan of the Dashboard component and state before making changes.
+- Must begin with a read-only audit and plan of existing empty states across Balances, Activity, Subscriptions, and Notes before making changes.
 - Must wait for explicit user approval before modifying any files.
-- Must be frontend-only and focused on Dashboard onboarding UX.
+- Must be frontend-only and focused on actionable empty states.
 - Must not alter backend logic, database behavior, migrations, dependencies, deployment, or environment files.
 
 ---
