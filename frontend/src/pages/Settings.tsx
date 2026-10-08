@@ -739,6 +739,43 @@ export default function Settings() {
           </form>
         </section>
 
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
+          <div className="mb-6 flex items-start gap-3">
+            <div className="rounded-2xl bg-emerald-100 p-2.5 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+              <Mail className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                Feedback & Support
+              </h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Have questions, suggestions, or need help? Contact the founder directly.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Founder direct email
+                </p>
+                <p className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
+                  founder@moneytracker.online
+                </p>
+              </div>
+
+              <a
+                href="mailto:founder@moneytracker.online?subject=Money%20Tracker%20Feedback"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-teal-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-700 focus:outline-none focus:ring-4 focus:ring-teal-100 dark:bg-teal-600 dark:hover:bg-teal-700 dark:focus:ring-teal-900/40"
+              >
+                <Mail className="h-4 w-4" />
+                <span>Send email</span>
+              </a>
+            </div>
+          </div>
+        </section>
+
         <section className="rounded-3xl border border-rose-200 bg-white p-6 shadow-sm dark:border-rose-900/40 dark:bg-slate-900 sm:p-8">
           <div className="mb-6 flex items-start gap-3">
             <div className="rounded-2xl bg-rose-100 p-2.5 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">

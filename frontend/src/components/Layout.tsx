@@ -4,6 +4,7 @@ import {
   ChartNoAxesColumn,
   LayoutDashboard,
   LogOut,
+  Mail,
   NotebookText,
   Repeat,
   Settings,
@@ -85,6 +86,14 @@ export default function Layout() {
                 <Settings className="h-5 w-5 shrink-0" />
                 <span>Settings</span>
               </NavLink>
+
+              <a
+                href="mailto:founder@moneytracker.online?subject=Money%20Tracker%20Feedback"
+                className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold tracking-[0.01em] text-white/75 transition-all duration-200 hover:bg-white/10 hover:text-white"
+              >
+                <Mail className="h-5 w-5 shrink-0" />
+                <span>Feedback & Support</span>
+              </a>
 
               <button
                 onClick={handleLogout}
@@ -191,6 +200,15 @@ export default function Layout() {
                     <Settings className="h-5 w-5 shrink-0" />
                     <span>Settings</span>
                   </NavLink>
+
+                  <a
+                    href="mailto:founder@moneytracker.online?subject=Money%20Tracker%20Feedback"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold tracking-[0.01em] text-white/75 transition-all duration-200 hover:bg-white/10 hover:text-white"
+                  >
+                    <Mail className="h-5 w-5 shrink-0" />
+                    <span>Feedback & Support</span>
+                  </a>
 
                   <button
                     onClick={handleLogout}
