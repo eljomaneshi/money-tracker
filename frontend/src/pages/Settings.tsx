@@ -1,23 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  AlertTriangle,
   Bell,
-  Download,
-  Eye,
-  FileJson,
-  FileSpreadsheet,
   Mail,
   Save,
   Settings as SettingsIcon,
   ShieldCheck,
-  Sparkles,
   User,
   WalletCards,
-  X,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
-import { useAuth } from "../contexts/AuthContext";
+import { SettingsSection } from "../components/settings/SettingsSection";
+import { ExportDataCard } from "../components/settings/ExportDataCard";
+import { AiInsightsCard } from "../components/settings/AiInsightsCard";
+import { DangerZoneCard } from "../components/settings/DangerZoneCard";
+import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
+import { Select } from "../components/ui/Select";
+import { Skeleton } from "../components/ui/Skeleton";
 
 type Currency = "ALL" | "EUR" | "GBP" | "USD";
 
@@ -37,6 +36,7 @@ const ALL_CURRENCIES: Currency[] = ["ALL", "EUR", "GBP", "USD"];
 export default function Settings() {
   const [isLoading, setIsLoading] = useState(true);
 
+  // Account state
   const [currentEmail, setCurrentEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -44,14 +44,17 @@ export default function Settings() {
   const [pendingNewEmail, setPendingNewEmail] = useState("");
   const [emailChangeCode, setEmailChangeCode] = useState("");
 
+  // Password state
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
 
+  // Currency preferences state
   const [mainCurrency, setMainCurrency] = useState<Currency>("ALL");
   const [showSecondCurrency, setShowSecondCurrency] = useState(true);
   const [secondCurrency, setSecondCurrency] = useState<Currency>("EUR");
 
+  // Notification preferences state
   const [subscriptionReminderEmails, setSubscriptionReminderEmails] =
     useState(true);
   const [subscriptionCreatedEmail, setSubscriptionCreatedEmail] =
@@ -59,38 +62,18 @@ export default function Settings() {
   const [subscriptionCancelledEmail, setSubscriptionCancelledEmail] =
     useState(true);
 
+  // Notification banners
   const [accountMessage, setAccountMessage] = useState("");
-  const [preferencesMessage, setPreferencesMessage] = useState("");
-  const [notificationsMessage, setNotificationsMessage] = useState("");
-
   const [accountError, setAccountError] = useState("");
+  const [preferencesMessage, setPreferencesMessage] = useState("");
   const [preferencesError, setPreferencesError] = useState("");
+  const [notificationsMessage, setNotificationsMessage] = useState("");
   const [notificationsError, setNotificationsError] = useState("");
 
+  // Loading states
   const [savingAccount, setSavingAccount] = useState(false);
   const [savingPreferences, setSavingPreferences] = useState(false);
   const [savingNotifications, setSavingNotifications] = useState(false);
-
-  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
-  const [deleteAccountText, setDeleteAccountText] = useState("");
-  const [deletingAccount, setDeletingAccount] = useState(false);
-
-  const [isExportingJson, setIsExportingJson] = useState(false);
-  const [isExportingCsv, setIsExportingCsv] = useState(false);
-  const [exportError, setExportError] = useState("");
-  const [exportSuccess, setExportSuccess] = useState("");
-
-  const [aiOptIn, setAiOptIn] = useState(false);
-  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
-  const [isLoadingAiPreview, setIsLoadingAiPreview] = useState(false);
-  const [aiSummary, setAiSummary] = useState("");
-  const [aiError, setAiError] = useState("");
-  const [aiSuccess, setAiSuccess] = useState("");
-  const [aiPreviewData, setAiPreviewData] = useState<any | null>(null);
-  const [showAiPreviewModal, setShowAiPreviewModal] = useState(false);
-
-  const { logout } = useAuth();
-  const navigate = useNavigate();
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -105,12 +88,9 @@ export default function Settings() {
         setSubscriptionReminderEmails(data.notifySubscriptionReminder);
         setSubscriptionCreatedEmail(data.notifySubscriptionCreated);
         setSubscriptionCancelledEmail(data.notifySubscriptionCancelled);
-
-        const savedOptIn = localStorage.getItem(`moneytracker_ai_insights_opt_in_${data.email}`);
-        setAiOptIn(savedOptIn === "true");
       } catch (error: any) {
         setAccountError(
-          error?.response?.data?.error || "Failed to load settings."
+          error?.response?.data?.error || "Failed to load account settings."
         );
       } finally {
         setIsLoading(false);
@@ -135,7 +115,7 @@ export default function Settings() {
     }
   };
 
-  const handleSaveName = async (e: React.FormEvent) => {
+  const handleSaveName = async (e: FormEvent) => {
     e.preventDefault();
     setAccountMessage("");
     setAccountError("");
@@ -144,7 +124,7 @@ export default function Settings() {
     try {
       const { data } = await api.patch("/users/me/profile", { fullName });
       setFullName(data.user.fullName ?? "");
-      setAccountMessage("Full name saved successfully.");
+      setAccountMessage("Full name updated successfully.");
     } catch (error: any) {
       setAccountError(
         error?.response?.data?.error || "Failed to save full name."
@@ -154,7 +134,7 @@ export default function Settings() {
     }
   };
 
-  const handleRequestEmailChangeCode = async (e: React.FormEvent) => {
+  const handleRequestEmailChangeCode = async (e: FormEvent) => {
     e.preventDefault();
     setAccountMessage("");
     setAccountError("");
@@ -170,7 +150,7 @@ export default function Settings() {
       setPendingNewEmail(normalizedEmail);
       setEmailChangeCode("");
       setEmailChangeStep(2);
-      setAccountMessage("Verification code sent to your new email.");
+      setAccountMessage("Verification code sent to your new email address.");
     } catch (error: any) {
       setAccountError(
         error?.response?.data?.error || "Failed to send verification code."
@@ -180,7 +160,7 @@ export default function Settings() {
     }
   };
 
-  const handleConfirmEmailChange = async (e: React.FormEvent) => {
+  const handleConfirmEmailChange = async (e: FormEvent) => {
     e.preventDefault();
     setAccountMessage("");
     setAccountError("");
@@ -207,7 +187,7 @@ export default function Settings() {
     }
   };
 
-  const handleUpdatePassword = async (e: React.FormEvent) => {
+  const handleUpdatePassword = async (e: FormEvent) => {
     e.preventDefault();
     setAccountMessage("");
     setAccountError("");
@@ -243,7 +223,7 @@ export default function Settings() {
     }
   };
 
-  const handleSavePreferences = async (e: React.FormEvent) => {
+  const handleSavePreferences = async (e: FormEvent) => {
     e.preventDefault();
     setPreferencesMessage("");
     setPreferencesError("");
@@ -256,7 +236,7 @@ export default function Settings() {
         secondCurrency: showSecondCurrency ? secondCurrency : null,
       });
 
-      setPreferencesMessage("Preferences updated successfully.");
+      setPreferencesMessage("Display preferences saved successfully.");
     } catch (error: any) {
       setPreferencesError(
         error?.response?.data?.error || "Failed to update preferences."
@@ -266,7 +246,7 @@ export default function Settings() {
     }
   };
 
-  const handleSaveNotifications = async (e: React.FormEvent) => {
+  const handleSaveNotifications = async (e: FormEvent) => {
     e.preventDefault();
     setNotificationsMessage("");
     setNotificationsError("");
@@ -279,1016 +259,471 @@ export default function Settings() {
         notifySubscriptionCancelled: subscriptionCancelledEmail,
       });
 
-      setNotificationsMessage("Notification settings updated successfully.");
+      setNotificationsMessage("Notification settings saved successfully.");
     } catch (error: any) {
       setNotificationsError(
-        error?.response?.data?.error ||
-          "Failed to update notification settings."
+        error?.response?.data?.error || "Failed to update notification settings."
       );
     } finally {
       setSavingNotifications(false);
     }
   };
 
-  const handleDeleteAccount = async () => {
-    setAccountMessage("");
-    setAccountError("");
-
-    if (deleteAccountText !== "DELETE") {
-      setAccountError('Please type DELETE to confirm account removal.');
-      return;
-    }
-
-    try {
-      setDeletingAccount(true);
-      await api.delete("/users/me");
-      logout();
-      navigate("/register");
-    } catch (error: any) {
-      setAccountError(
-        error?.response?.data?.error || "Failed to delete account."
-      );
-    } finally {
-      setDeletingAccount(false);
-    }
-  };
-
-  const handleExportData = async (format: "json" | "csv") => {
-    setExportError("");
-    setExportSuccess("");
-    if (format === "json") {
-      setIsExportingJson(true);
-    } else {
-      setIsExportingCsv(true);
-    }
-
-    try {
-      const response = await api.get(`/users/me/export?format=${format}`, {
-        responseType: "blob",
-      });
-
-      const blob = new Blob([response.data], {
-        type: format === "json" ? "application/json" : "text/csv;charset=utf-8;",
-      });
-
-      const dateStr = new Date().toISOString().split("T")[0];
-      const filename =
-        format === "json"
-          ? `money-tracker-export-${dateStr}.json`
-          : `money-tracker-ledger-${dateStr}.csv`;
-
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(downloadUrl);
-
-      setExportSuccess(
-        format === "json"
-          ? "Full JSON backup downloaded successfully."
-          : "CSV activity ledger downloaded successfully."
-      );
-    } catch (err: any) {
-      if (err?.response?.data instanceof Blob) {
-        try {
-          const text = await err.response.data.text();
-          const parsed = JSON.parse(text);
-          setExportError(parsed.error || "Failed to export data. Please try again.");
-        } catch {
-          setExportError("Failed to export data. Please try again.");
-        }
-      } else if (err?.response?.status === 429) {
-        setExportError("Too many export requests. Please try again in 15 minutes.");
-      } else {
-        setExportError(
-          err?.response?.data?.error ||
-            "Failed to export data. Please check your connection and try again."
-        );
-      }
-    } finally {
-      if (format === "json") {
-        setIsExportingJson(false);
-      } else {
-        setIsExportingCsv(false);
-      }
-    }
-  };
-
-  const handleToggleAiOptIn = (enabled: boolean) => {
-    setAiError("");
-    setAiSuccess("");
-    const key = `moneytracker_ai_insights_opt_in_${currentEmail}`;
-    if (enabled) {
-      setAiOptIn(true);
-      if (currentEmail) {
-        localStorage.setItem(key, "true");
-      }
-      setAiSuccess("AI insights enabled. You can generate spending summaries or review data anytime.");
-    } else {
-      setAiOptIn(false);
-      if (currentEmail) {
-        localStorage.removeItem(key);
-      }
-      setAiSummary("");
-      setAiPreviewData(null);
-      setShowAiPreviewModal(false);
-      setAiSuccess("AI insights disabled. All cached summaries cleared.");
-    }
-  };
-
-  const handlePreviewAiData = async () => {
-    setAiError("");
-    setIsLoadingAiPreview(true);
-    try {
-      const response = await api.get("/users/me/ai-insights/preview");
-      setAiPreviewData(response.data?.metrics || response.data);
-      setShowAiPreviewModal(true);
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
-        setAiPreviewData({
-          currency: mainCurrency || "EUR",
-          monthlyTotal: 0,
-          topCategories: [],
-          activeSubscriptionsCount: 0,
-          subscriptionMonthlyTotal: 0,
-          notice: "Sample schema: only numeric aggregates are transmitted.",
-        });
-        setShowAiPreviewModal(true);
-      } else {
-        setAiError(
-          err?.response?.data?.error ||
-            "Failed to load data preview. Please check your connection and try again."
-        );
-      }
-    } finally {
-      setIsLoadingAiPreview(false);
-    }
-  };
-
-  const handleGenerateAiInsights = async () => {
-    if (!aiOptIn) {
-      setAiError("Please enable the AI Insights feature before generating summaries.");
-      return;
-    }
-    setAiError("");
-    setAiSuccess("");
-    setIsGeneratingAi(true);
-    try {
-      const response = await api.post("/users/me/ai-insights/generate", {
-        optInConfirmed: true,
-      });
-      setAiSummary(response.data?.summary || "No insights returned.");
-      setAiSuccess("AI financial insight generated successfully.");
-    } catch (err: any) {
-      if (err?.response?.status === 429) {
-        setAiError("Too many analysis requests. Please try again later.");
-      } else if (err?.response?.status === 501) {
-        setAiError(
-          err?.response?.data?.error ||
-            "Claude AI service is not configured on this server."
-        );
-      } else {
-        setAiError(
-          err?.response?.data?.error ||
-            "Failed to generate AI insights. Please check your connection and try again."
-        );
-      }
-    } finally {
-      setIsGeneratingAi(false);
-    }
-  };
-
   if (isLoading) {
     return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 sm:p-8">
-        Loading settings...
+      <div className="space-y-6 sm:space-y-8">
+        <div>
+          <Skeleton className="h-10 w-48 rounded-2xl" />
+          <Skeleton className="mt-2 h-5 w-80 rounded-lg" />
+        </div>
+        {[1, 2, 3].map((i) => (
+          <div
+            key={`settings-skeleton-${i}`}
+            className="rounded-3xl border border-slate-200/90 bg-white p-6 dark:border-white/10 dark:bg-[#0d1526] sm:p-8"
+          >
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-10 w-10 rounded-2xl" />
+              <div className="space-y-1.5">
+                <Skeleton className="h-6 w-40 rounded-lg" />
+                <Skeleton className="h-4 w-64 rounded-md" />
+              </div>
+            </div>
+            <div className="mt-6 space-y-4">
+              <Skeleton className="h-12 w-full rounded-2xl" />
+              <Skeleton className="h-12 w-full rounded-2xl" />
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
 
   return (
-    <>
-      <div className="space-y-6 sm:space-y-8">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="rounded-2xl bg-slate-200 p-2.5 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-              <SettingsIcon className="h-6 w-6" />
-            </div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 sm:text-4xl">
-              Settings
-            </h1>
+    <div className="space-y-6 sm:space-y-8">
+      {/* Page Header */}
+      <div>
+        <div className="flex items-center gap-3">
+          <div className="rounded-2xl bg-slate-200 p-2.5 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            <SettingsIcon className="h-6 w-6" />
           </div>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 sm:text-base">
-            Manage your account details, currency display, and email notifications.
-          </p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 sm:text-4xl">
+            Settings
+          </h1>
         </div>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 sm:text-base">
+          Manage your personal account details, currency preferences, and notification controls.
+        </p>
+      </div>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
-          <div className="mb-6 flex items-start gap-3">
-            <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
-              <User className="h-5 w-5" />
+      {/* 1. Account Details & Password */}
+      <SettingsSection
+        icon={User}
+        iconBg="bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300"
+        title="Account & Security"
+        description="Manage your profile information, registered email address, and account password."
+        successMessage={accountMessage}
+        errorMessage={accountError}
+      >
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          {/* Current Email Display */}
+          <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-5 dark:border-white/5 dark:bg-[#070b14]/50">
+            <div className="mb-2 flex items-center gap-2">
+              <Mail className="h-4 w-4 text-slate-400" />
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Current Registered Email
+              </label>
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                Account
-              </h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Manage your personal details and sign-in information.
-              </p>
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm text-slate-900 dark:border-white/10 dark:bg-[#0d1526] dark:text-slate-100">
+              {currentEmail}
             </div>
           </div>
 
-          {accountMessage && (
-            <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
-              {accountMessage}
-            </div>
-          )}
-
-          {accountError && (
-            <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">
-              {accountError}
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950">
-              <div className="mb-3 flex items-center gap-2">
-                <Mail className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Current email
-                </label>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
-                {currentEmail}
-              </div>
-            </div>
-
-            <form
-              onSubmit={handleSaveName}
-              className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950"
-            >
-              <div className="mb-3 flex items-center gap-2">
-                <User className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Full name
-                </label>
-              </div>
-              <input
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Enter your full name"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-              />
-              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                This name is used for your account profile.
-              </p>
-              <button
+          {/* Full Name Form */}
+          <form
+            onSubmit={handleSaveName}
+            className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-5 dark:border-white/5 dark:bg-[#070b14]/50"
+          >
+            <Input
+              label="Full Name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Enter your full name"
+              helperText="This name appears in your personal dashboard greeting."
+            />
+            <div className="mt-4">
+              <Button
                 type="submit"
-                disabled={savingAccount}
-                className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:disabled:bg-blue-900/40"
+                variant="primary"
+                size="sm"
+                isLoading={savingAccount}
+                leftIcon={<Save className="h-4 w-4" />}
               >
-                <Save className="h-4 w-4" />
-                {savingAccount ? "Saving..." : "Save name"}
-              </button>
-            </form>
+                Save name
+              </Button>
+            </div>
+          </form>
 
-            <form
-              onSubmit={
-                emailChangeStep === 1
-                  ? handleRequestEmailChangeCode
-                  : handleConfirmEmailChange
-              }
-              className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950 xl:col-span-2"
-            >
-              <div className="mb-3 flex items-center gap-2">
-                <Mail className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Change email
-                </label>
-              </div>
+          {/* Change Email Two-Step Form */}
+          <form
+            onSubmit={
+              emailChangeStep === 1
+                ? handleRequestEmailChangeCode
+                : handleConfirmEmailChange
+            }
+            className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-5 dark:border-white/5 dark:bg-[#070b14]/50 xl:col-span-2"
+          >
+            <div className="mb-3 flex items-center gap-2">
+              <Mail className="h-4 w-4 text-slate-400" />
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Change Email Address
+              </label>
+            </div>
 
-              {emailChangeStep === 1 ? (
-                <>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto]">
-                    <input
+            {emailChangeStep === 1 ? (
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className="flex-1">
+                    <Input
                       type="email"
                       value={newEmail}
                       onChange={(e) => setNewEmail(e.target.value)}
-                      placeholder="Enter your new email"
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                    />
-                    <button
-                      type="submit"
-                      disabled={savingAccount}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:disabled:bg-blue-900/40"
-                    >
-                      <Save className="h-4 w-4" />
-                      {savingAccount ? "Sending..." : "Send verification code"}
-                    </button>
-                  </div>
-                  <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                    We will send a verification code to your new email before changing it.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <input
-                      type="email"
-                      value={pendingNewEmail}
-                      readOnly
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    />
-                    <input
-                      type="text"
-                      value={emailChangeCode}
-                      onChange={(e) => setEmailChangeCode(e.target.value)}
-                      placeholder="Enter verification code"
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+                      placeholder="Enter new email address"
+                      required
                     />
                   </div>
-
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <button
-                      type="submit"
-                      disabled={savingAccount}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:disabled:bg-blue-900/40"
-                    >
-                      <Save className="h-4 w-4" />
-                      {savingAccount ? "Confirming..." : "Confirm email change"}
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={savingAccount}
-                      onClick={() => {
-                        setEmailChangeStep(1);
-                        setPendingNewEmail("");
-                        setEmailChangeCode("");
-                        setAccountMessage("");
-                        setAccountError("");
-                      }}
-                      className="inline-flex items-center justify-center rounded-2xl bg-slate-200 px-5 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-                    >
-                      Change email address
-                    </button>
-                  </div>
-
-                  <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                    Enter the code sent to your new email to finish the update.
-                  </p>
-                </>
-              )}
-            </form>
-
-            <form
-              onSubmit={handleUpdatePassword}
-              className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950 xl:col-span-2"
-            >
-              <div className="flex items-start gap-3">
-                <div className="rounded-2xl bg-amber-100 p-2.5 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
-                  <ShieldCheck className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
-                    Change password
-                  </h3>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Choose a strong password you do not use elsewhere.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Current password
-                  </label>
-                  <input
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Enter current password"
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                    New password
-                  </label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new password"
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Confirm new password
-                  </label>
-                  <input
-                    type="password"
-                    value={confirmNewPassword}
-                    onChange={(e) => setConfirmNewPassword(e.target.value)}
-                    placeholder="Confirm new password"
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={savingAccount}
-                className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:disabled:bg-blue-900/40"
-              >
-                <Save className="h-4 w-4" />
-                {savingAccount ? "Saving..." : "Update password"}
-              </button>
-            </form>
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
-          <div className="mb-6 flex items-start gap-3">
-            <div className="rounded-2xl bg-teal-100 p-2.5 text-teal-700 dark:bg-teal-950/50 dark:text-teal-300">
-              <WalletCards className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                Preferences
-              </h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Choose how balances and totals are displayed in the app.
-              </p>
-            </div>
-          </div>
-
-          {preferencesMessage && (
-            <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
-              {preferencesMessage}
-            </div>
-          )}
-
-          {preferencesError && (
-            <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">
-              {preferencesError}
-            </div>
-          )}
-
-          <form onSubmit={handleSavePreferences} className="space-y-6">
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950">
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Main currency for totals
-                </label>
-                <select
-                  value={mainCurrency}
-                  onChange={(e) => handleMainCurrencyChange(e.target.value as Currency)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                >
-                  {ALL_CURRENCIES.map((currency) => (
-                    <option key={currency} value={currency}>
-                      {currency}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                  This currency is used for total balances shown in Dashboard and Balance.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950">
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Show second currency
-                </label>
-                <select
-                  value={showSecondCurrency ? "yes" : "no"}
-                  onChange={(e) => setShowSecondCurrency(e.target.value === "yes")}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                >
-                  <option value="yes">Yes</option>
-                  <option value="no">No</option>
-                </select>
-                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                  When enabled, a second converted currency is shown across totals,
-                  accounts, expenses, and subscriptions.
-                </p>
-              </div>
-
-              {showSecondCurrency && (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950">
-                  <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Second currency
-                  </label>
-                  <select
-                    value={secondCurrency}
-                    onChange={(e) => setSecondCurrency(e.target.value as Currency)}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="md"
+                    isLoading={savingAccount}
+                    leftIcon={<Save className="h-4 w-4" />}
                   >
-                    {availableSecondCurrencies.map((currency) => (
-                      <option key={currency} value={currency}>
-                        {currency}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                    The same second currency will be used everywhere in the app. If an
-                    account or transaction already uses that currency, it will not be
-                    shown twice.
-                  </p>
+                    Send verification code
+                  </Button>
                 </div>
-              )}
-            </div>
-
-            <button
-              type="submit"
-              disabled={savingPreferences}
-              className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:disabled:bg-blue-900/40"
-            >
-              <Save className="h-4 w-4" />
-              {savingPreferences ? "Saving..." : "Save preferences"}
-            </button>
-          </form>
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
-          <div className="mb-6 flex items-start gap-3">
-            <div className="rounded-2xl bg-amber-100 p-2.5 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
-              <Bell className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                Notifications
-              </h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Choose which subscription-related emails you want to receive.
-              </p>
-            </div>
-          </div>
-
-          {notificationsMessage && (
-            <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
-              {notificationsMessage}
-            </div>
-          )}
-
-          {notificationsError && (
-            <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">
-              {notificationsError}
-            </div>
-          )}
-
-          <form onSubmit={handleSaveNotifications} className="space-y-4">
-            <div className="divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-950">
-              <label className="flex cursor-pointer items-center justify-between gap-4 p-5">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    Subscription reminder emails
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Receive an email reminder before a subscription is due.
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={subscriptionReminderEmails}
-                  onChange={(e) => setSubscriptionReminderEmails(e.target.checked)}
-                  className="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900"
-                />
-              </label>
-
-              <label className="flex cursor-pointer items-center justify-between gap-4 p-5">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    Subscription created email
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Receive an email when a new subscription is added.
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={subscriptionCreatedEmail}
-                  onChange={(e) => setSubscriptionCreatedEmail(e.target.checked)}
-                  className="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900"
-                />
-              </label>
-
-              <label className="flex cursor-pointer items-center justify-between gap-4 p-5">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    Subscription cancelled email
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Receive an email when a subscription is cancelled.
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={subscriptionCancelledEmail}
-                  onChange={(e) => setSubscriptionCancelledEmail(e.target.checked)}
-                  className="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900"
-                />
-              </label>
-            </div>
-
-            <button
-              type="submit"
-              disabled={savingNotifications}
-              className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:disabled:bg-blue-900/40"
-            >
-              <Save className="h-4 w-4" />
-              {savingNotifications ? "Saving..." : "Save notification settings"}
-            </button>
-          </form>
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
-          <div className="mb-6 flex items-start gap-3">
-            <div className="rounded-2xl bg-emerald-100 p-2.5 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-              <Mail className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                Feedback & Support
-              </h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Have questions, suggestions, or need help? Contact the founder directly.
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Founder direct email
-                </p>
-                <p className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
-                  founder@moneytracker.online
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  We will send a one-time verification code to the new address before completing the update.
                 </p>
               </div>
-
-              <a
-                href="mailto:founder@moneytracker.online?subject=Money%20Tracker%20Feedback"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-teal-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-700 focus:outline-none focus:ring-4 focus:ring-teal-100 dark:bg-teal-600 dark:hover:bg-teal-700 dark:focus:ring-teal-900/40"
-              >
-                <Mail className="h-4 w-4" />
-                <span>Send email</span>
-              </a>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
-          <div className="mb-6 flex items-start gap-3">
-            <div className="rounded-2xl bg-indigo-100 p-2.5 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
-              <Download className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                Data Portability & Export
-              </h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Download a complete copy of your personal financial records for backup or analysis.
-              </p>
-            </div>
-          </div>
-
-          {exportSuccess && (
-            <div
-              role="status"
-              aria-live="polite"
-              className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300"
-            >
-              {exportSuccess}
-            </div>
-          )}
-
-          {exportError && (
-            <div
-              role="alert"
-              aria-live="assertive"
-              className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
-            >
-              {exportError}
-            </div>
-          )}
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950">
-              <div>
-                <div className="flex items-center gap-2">
-                  <FileJson className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                  <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                    JSON Data Archive
-                  </h3>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Input
+                    label="Pending New Email"
+                    value={pendingNewEmail}
+                    readOnly
+                    className="font-mono bg-slate-100 dark:bg-slate-900"
+                  />
+                  <Input
+                    label="Verification Code"
+                    value={emailChangeCode}
+                    onChange={(e) => setEmailChangeCode(e.target.value)}
+                    placeholder="Enter 6-digit code"
+                    className="font-mono"
+                    required
+                  />
                 </div>
-                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                  Full structured backup containing your profile preferences, accounts, all expenses, subscriptions, notes, and activity history.
-                </p>
-              </div>
 
-              <div className="mt-5">
-                <button
-                  type="button"
-                  onClick={() => handleExportData("json")}
-                  disabled={isExportingJson || isExportingCsv}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-indigo-600 dark:hover:bg-indigo-700 dark:focus:ring-indigo-900/40"
-                >
-                  <Download className="h-4 w-4" />
-                  <span>{isExportingJson ? "Generating JSON..." : "Download JSON backup"}</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950">
-              <div>
-                <div className="flex items-center gap-2">
-                  <FileSpreadsheet className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                  <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                    CSV Activity Ledger
-                  </h3>
-                </div>
-                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                  Spreadsheet-compatible ledger of all financial activity, expenses, deposits, withdrawals, and subscriptions for Excel or Google Sheets.
-                </p>
-              </div>
-
-              <div className="mt-5">
-                <button
-                  type="button"
-                  onClick={() => handleExportData("csv")}
-                  disabled={isExportingJson || isExportingCsv}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:focus:ring-slate-800"
-                >
-                  <Download className="h-4 w-4" />
-                  <span>{isExportingCsv ? "Generating CSV..." : "Download CSV ledger"}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
-          <div className="mb-6 flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="rounded-2xl bg-violet-100 p-2.5 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                    AI Insights (Optional)
-                  </h2>
-                  <span
-                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      aiOptIn
-                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
-                        : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
-                    }`}
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="md"
+                    isLoading={savingAccount}
+                    leftIcon={<Save className="h-4 w-4" />}
                   >
-                    {aiOptIn ? "Opted In" : "Disabled"}
-                  </span>
+                    Confirm email change
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="md"
+                    onClick={() => {
+                      setEmailChangeStep(1);
+                      setPendingNewEmail("");
+                      setEmailChangeCode("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
                 </div>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  Optional, privacy-preserving monthly spending summaries powered by Claude.
-                </p>
               </div>
+            )}
+          </form>
+
+          {/* Change Password Form */}
+          <form
+            onSubmit={handleUpdatePassword}
+            className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-5 dark:border-white/5 dark:bg-[#070b14]/50 xl:col-span-2"
+          >
+            <div className="mb-4 flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-amber-500" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                Update Password
+              </h3>
             </div>
 
-            <button
-              type="button"
-              onClick={() => handleToggleAiOptIn(!aiOptIn)}
-              aria-pressed={aiOptIn}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 ${
-                aiOptIn ? "bg-violet-600" : "bg-slate-300 dark:bg-slate-700"
-              }`}
-            >
-              <span className="sr-only">Toggle AI Insights</span>
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  aiOptIn ? "translate-x-5" : "translate-x-0"
-                }`}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Input
+                label="Current Password"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="••••••••"
+                required
               />
-            </button>
-          </div>
-
-          {aiSuccess && (
-            <div
-              role="status"
-              aria-live="polite"
-              className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300"
-            >
-              {aiSuccess}
+              <Input
+                label="New Password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+              />
+              <Input
+                label="Confirm New Password"
+                type="password"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+              />
             </div>
-          )}
 
-          {aiError && (
-            <div
-              role="alert"
-              aria-live="assertive"
-              className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
-            >
-              {aiError}
-            </div>
-          )}
-
-          <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Privacy & Data Guarantees
-            </h3>
-            <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
-              <div className="flex items-start gap-2 text-slate-600 dark:text-slate-300">
-                <span className="mt-0.5 font-bold text-emerald-600 dark:text-emerald-400">✔</span>
-                <span>
-                  <strong>What Claude sees:</strong> High-level numeric aggregates only (total 30-day spend, category percentages, subscription count).
-                </span>
-              </div>
-              <div className="flex items-start gap-2 text-slate-600 dark:text-slate-300">
-                <span className="mt-0.5 font-bold text-rose-600 dark:text-rose-400">✖</span>
-                <span>
-                  <strong>What Claude NEVER sees:</strong> Your name, email, specific purchase descriptions, merchants, bank names, or notes.
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={handlePreviewAiData}
-              disabled={isLoadingAiPreview}
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:focus:ring-slate-800"
-            >
-              <Eye className="h-4 w-4 text-slate-500" />
-              <span>{isLoadingAiPreview ? "Loading preview..." : "Preview data"}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleGenerateAiInsights}
-              disabled={!aiOptIn || isGeneratingAi}
-              className="inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700 focus:outline-none focus:ring-4 focus:ring-violet-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-violet-600 dark:hover:bg-violet-700 dark:focus:ring-violet-900/40"
-            >
-              <Sparkles className="h-4 w-4" />
-              <span>{isGeneratingAi ? "Analyzing aggregates..." : "Generate insights"}</span>
-            </button>
-
-            {aiOptIn && (
-              <button
-                type="button"
-                onClick={() => handleToggleAiOptIn(false)}
-                className="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300 dark:hover:bg-rose-950/50"
+            <div className="mt-4">
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                isLoading={savingAccount}
+                leftIcon={<Save className="h-4 w-4" />}
               >
-                Revoke consent
-              </button>
+                Update password
+              </Button>
+            </div>
+          </form>
+        </div>
+      </SettingsSection>
+
+      {/* 2. Display Preferences */}
+      <SettingsSection
+        icon={WalletCards}
+        iconBg="bg-teal-100 text-teal-700 dark:bg-teal-950/50 dark:text-teal-300"
+        title="Display & Currency Preferences"
+        description="Choose default currency formats and configure dual-currency balance views."
+        successMessage={preferencesMessage}
+        errorMessage={preferencesError}
+      >
+        <form onSubmit={handleSavePreferences} className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Select
+              label="Primary totals currency"
+              value={mainCurrency}
+              onChange={(e) => handleMainCurrencyChange(e.target.value as Currency)}
+              options={ALL_CURRENCIES.map((c) => ({ value: c, label: c }))}
+              helperText="This currency is used for consolidated totals across your Dashboard and Balance views."
+            />
+
+            <Select
+              label="Show secondary converted currency"
+              value={showSecondCurrency ? "yes" : "no"}
+              onChange={(e) => setShowSecondCurrency(e.target.value === "yes")}
+              options={[
+                { value: "yes", label: "Yes (Show secondary conversion)" },
+                { value: "no", label: "No (Primary only)" },
+              ]}
+              helperText="Displays real-time secondary conversions alongside balances and expenses."
+            />
+
+            {showSecondCurrency && (
+              <div className="sm:col-span-2">
+                <Select
+                  label="Secondary display currency"
+                  value={secondCurrency}
+                  onChange={(e) => setSecondCurrency(e.target.value as Currency)}
+                  options={availableSecondCurrencies.map((c) => ({
+                    value: c,
+                    label: c,
+                  }))}
+                  helperText="The secondary currency applied across accounts and transactions."
+                />
+              </div>
             )}
           </div>
 
-          {aiSummary && (
-            <div className="mt-6 rounded-2xl border border-violet-200 bg-violet-50/70 p-5 dark:border-violet-900/40 dark:bg-violet-950/30">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 font-semibold text-violet-900 dark:text-violet-200">
-                  <Sparkles className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-                  <span>Claude Spending Observations</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setAiSummary("")}
-                  className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                >
-                  Dismiss
-                </button>
-              </div>
-              <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-                {aiSummary}
-              </p>
-            </div>
-          )}
-
-          {showAiPreviewModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-              <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 sm:p-8">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                      Sanitized Data Preview
-                    </h3>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      This is the exact JSON payload evaluated for insights. Notice that descriptions, personal notes, and account identities are completely absent.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowAiPreviewModal(false)}
-                    className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-
-                <div className="mt-4 max-h-72 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
-                  <pre className="font-mono text-xs text-slate-800 dark:text-slate-200">
-                    {JSON.stringify(aiPreviewData, null, 2)}
-                  </pre>
-                </div>
-
-                <div className="mt-6 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setShowAiPreviewModal(false)}
-                    className="rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </section>
-
-        <section className="rounded-3xl border border-rose-200 bg-white p-6 shadow-sm dark:border-rose-900/40 dark:bg-slate-900 sm:p-8">
-          <div className="mb-6 flex items-start gap-3">
-            <div className="rounded-2xl bg-rose-100 p-2.5 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
-              <AlertTriangle className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-rose-700 dark:text-rose-300">
-                Danger zone
-              </h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Permanently delete your account and all accounts, expenses,
-                subscriptions, and settings.
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              setDeleteAccountText("");
-              setAccountError("");
-              setShowDeleteAccountModal(true);
-            }}
-            className="inline-flex items-center rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700"
+          <Button
+            type="submit"
+            variant="primary"
+            size="md"
+            isLoading={savingPreferences}
+            leftIcon={<Save className="h-4 w-4" />}
           >
-            Delete my account
-          </button>
-        </section>
-      </div>
+            Save preferences
+          </Button>
+        </form>
+      </SettingsSection>
 
-      {showDeleteAccountModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-              Permanently delete account?
-            </h3>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              This will permanently delete your account and all your data. This action
-              cannot be undone.
-            </p>
-
-            <div className="mt-4">
-              <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Type DELETE to confirm
-              </label>
-              <input
-                value={deleteAccountText}
-                onChange={(e) => setDeleteAccountText(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-rose-500 focus:ring-4 focus:ring-rose-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-rose-400 dark:focus:ring-rose-900/40"
-                placeholder="DELETE"
-              />
+      {/* 3. Subscription Email Notifications */}
+      <SettingsSection
+        icon={Bell}
+        iconBg="bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+        title="Email Notifications"
+        description="Configure automated transactional alerts and renewal reminder emails."
+        successMessage={notificationsMessage}
+        errorMessage={notificationsError}
+      >
+        <form onSubmit={handleSaveNotifications} className="space-y-4">
+          <div className="space-y-3">
+            {/* Reminder emails */}
+            <div className="flex items-center justify-between rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4 dark:border-white/5 dark:bg-[#070b14]/50">
+              <div>
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  Subscription renewal reminders
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  Receive an email reminder 3 days prior to an upcoming subscription renewal.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={subscriptionReminderEmails}
+                onClick={() =>
+                  setSubscriptionReminderEmails(!subscriptionReminderEmails)
+                }
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                  subscriptionReminderEmails
+                    ? "bg-emerald-600 dark:bg-emerald-500"
+                    : "bg-slate-300 dark:bg-slate-700"
+                }`}
+              >
+                <span className="sr-only">Toggle reminder emails</span>
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    subscriptionReminderEmails
+                      ? "translate-x-5"
+                      : "translate-x-0"
+                  }`}
+                />
+              </button>
             </div>
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+            {/* Created subscription emails */}
+            <div className="flex items-center justify-between rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4 dark:border-white/5 dark:bg-[#070b14]/50">
+              <div>
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  New subscription creation confirmation
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  Receive a confirmation email when a recurring subscription is registered.
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={() => setShowDeleteAccountModal(false)}
-                disabled={deletingAccount}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+                role="switch"
+                aria-checked={subscriptionCreatedEmail}
+                onClick={() =>
+                  setSubscriptionCreatedEmail(!subscriptionCreatedEmail)
+                }
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                  subscriptionCreatedEmail
+                    ? "bg-emerald-600 dark:bg-emerald-500"
+                    : "bg-slate-300 dark:bg-slate-700"
+                }`}
               >
-                Cancel
+                <span className="sr-only">Toggle creation confirmation emails</span>
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    subscriptionCreatedEmail ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
               </button>
+            </div>
+
+            {/* Cancelled subscription emails */}
+            <div className="flex items-center justify-between rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4 dark:border-white/5 dark:bg-[#070b14]/50">
+              <div>
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  Subscription cancellation confirmation
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  Receive an email notification when an existing subscription is cancelled.
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={handleDeleteAccount}
-                disabled={deletingAccount || deleteAccountText !== "DELETE"}
-                className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                role="switch"
+                aria-checked={subscriptionCancelledEmail}
+                onClick={() =>
+                  setSubscriptionCancelledEmail(!subscriptionCancelledEmail)
+                }
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                  subscriptionCancelledEmail
+                    ? "bg-emerald-600 dark:bg-emerald-500"
+                    : "bg-slate-300 dark:bg-slate-700"
+                }`}
               >
-                {deletingAccount ? "Deleting..." : "Delete forever"}
+                <span className="sr-only">Toggle cancellation emails</span>
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    subscriptionCancelledEmail
+                      ? "translate-x-5"
+                      : "translate-x-0"
+                  }`}
+                />
               </button>
             </div>
           </div>
+
+          <div className="pt-2">
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              isLoading={savingNotifications}
+              leftIcon={<Save className="h-4 w-4" />}
+            >
+              Save notification settings
+            </Button>
+          </div>
+        </form>
+      </SettingsSection>
+
+      {/* 4. Feedback & Direct Founder Support */}
+      <SettingsSection
+        icon={Mail}
+        iconBg="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+        title="Feedback & Founder Support"
+        description="Questions, bug reports, or feature requests? Contact the creator directly."
+      >
+        <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/90 bg-slate-50/70 p-5 dark:border-white/5 dark:bg-[#070b14]/50 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Founder Direct Channel
+            </p>
+            <p className="mt-0.5 font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">
+              founder@moneytracker.online
+            </p>
+          </div>
+
+          <a
+            href="mailto:founder@moneytracker.online?subject=Money%20Tracker%20Feedback"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-500 dark:bg-teal-600 dark:hover:bg-teal-500"
+          >
+            <Mail className="h-4 w-4" />
+            <span>Send email</span>
+          </a>
         </div>
-      )}
-    </>
+      </SettingsSection>
+
+      {/* 5. Data Portability & Export */}
+      <ExportDataCard />
+
+      {/* 6. Claude AI Financial Insights */}
+      <AiInsightsCard userEmail={currentEmail} mainCurrency={mainCurrency} />
+
+      {/* 7. Danger Zone Account Deletion */}
+      <DangerZoneCard />
+    </div>
   );
 }
