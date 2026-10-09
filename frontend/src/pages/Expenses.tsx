@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Receipt } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Receipt } from "lucide-react";
 import api from "../lib/api";
 import { formatMoney, convertAmount, type Currency, type ExchangeRates } from "../utils/formatMoney";
 import {
@@ -247,6 +247,33 @@ export default function Expenses() {
       return matchesDate && matchesAccount && matchesType;
     });
   }, [activityItems, categoryFilter, paidFromFilter, dateRange, selectedTypes]);
+
+  const PAGE_SIZE = 25;
+  const [currentPage, setCurrentPage] = useState(1);
+  const filterKey = `${categoryFilter}|${paidFromFilter}|${datePreset}|${dateFrom}|${dateTo}|${selectedTypes.join(",")}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+
+  // Reset to page 1 whenever any filter changes (adjusted during render to avoid cascading renders)
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey);
+    setCurrentPage(1);
+  }
+
+  const totalPages = Math.max(1, Math.ceil(filteredActivity.length / PAGE_SIZE));
+
+  // Clamp current page if total filtered items shrink (e.g. after editing/deleting)
+  if (currentPage > totalPages) {
+    setCurrentPage(totalPages);
+  }
+
+  const paginatedActivity = useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    return filteredActivity.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [filteredActivity, currentPage]);
+
+  const pageStartItem =
+    filteredActivity.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const pageEndItem = Math.min(currentPage * PAGE_SIZE, filteredActivity.length);
 
   const totals = useMemo(() => {
     if (!rates) return { expenses: 0, deposits: 0, withdrawals: 0, transfersOut: 0 };
@@ -660,6 +687,8 @@ export default function Expenses() {
         totals={totals}
         netCashflow={netCashflow}
         mainCurrency={mainCurrency}
+        pageStartItem={pageStartItem}
+        pageEndItem={pageEndItem}
       />
 
       {/* Ledger Content Area */}
@@ -693,15 +722,83 @@ export default function Expenses() {
           iconBg="bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
         />
       ) : (
-        <ActivityLedgerTable
-          items={filteredActivity}
-          onEditExpense={setEditingExpense}
-          formatExpenseAmount={formatExpenseAmount}
-          getActivityAmount={getActivityAmount}
-          getConvertedActivityAmount={getConvertedActivityAmount}
-          getAccountName={getAccountName}
-          getActionLabel={getActionLabel}
-        />
+        <div className="space-y-4">
+          <ActivityLedgerTable
+            items={paginatedActivity}
+            onEditExpense={setEditingExpense}
+            formatExpenseAmount={formatExpenseAmount}
+            getActivityAmount={getActivityAmount}
+            getConvertedActivityAmount={getConvertedActivityAmount}
+            getAccountName={getAccountName}
+            getActionLabel={getActionLabel}
+          />
+
+          {filteredActivity.length > 0 && totalPages > 1 && (
+            <Card
+              padding="sm"
+              className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border border-slate-200/90 dark:border-white/10"
+            >
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Showing{" "}
+                <span className="font-mono font-bold tabular-nums text-slate-900 dark:text-slate-100">
+                  {pageStartItem}–{pageEndItem}
+                </span>{" "}
+                of{" "}
+                <span className="font-mono font-bold tabular-nums text-slate-900 dark:text-slate-100">
+                  {filteredActivity.length}
+                </span>{" "}
+                activity items
+              </p>
+
+              <div
+                className="flex items-center gap-2"
+                role="navigation"
+                aria-label="Activity Ledger Pagination"
+              >
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setCurrentPage((p) => Math.max(1, p - 1));
+                    window.scrollTo({ top: 350, behavior: "smooth" });
+                  }}
+                  disabled={currentPage === 1}
+                  leftIcon={<ChevronLeft className="h-4 w-4" />}
+                  aria-label="Go to previous page"
+                >
+                  Previous
+                </Button>
+
+                <span className="px-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Page{" "}
+                  <span className="font-mono font-bold tabular-nums text-slate-900 dark:text-slate-100">
+                    {currentPage}
+                  </span>{" "}
+                  of{" "}
+                  <span className="font-mono font-bold tabular-nums text-slate-900 dark:text-slate-100">
+                    {totalPages}
+                  </span>
+                </span>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setCurrentPage((p) => Math.min(totalPages, p + 1));
+                    window.scrollTo({ top: 350, behavior: "smooth" });
+                  }}
+                  disabled={currentPage >= totalPages}
+                  rightIcon={<ChevronRight className="h-4 w-4" />}
+                  aria-label="Go to next page"
+                >
+                  Next
+                </Button>
+              </div>
+            </Card>
+          )}
+        </div>
       )}
 
       {/* Edit Expense Modal Dialog */}

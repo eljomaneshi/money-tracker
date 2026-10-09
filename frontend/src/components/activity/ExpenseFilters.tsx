@@ -67,6 +67,8 @@ interface ExpenseFiltersProps {
   totals?: TotalsData | null;
   netCashflow?: number;
   mainCurrency: Currency;
+  pageStartItem?: number;
+  pageEndItem?: number;
 }
 
 export function ExpenseFilters({
@@ -94,6 +96,8 @@ export function ExpenseFilters({
   totals,
   netCashflow = 0,
   mainCurrency,
+  pageStartItem,
+  pageEndItem,
 }: ExpenseFiltersProps) {
   const pos = mainCurrency === "ALL" ? "after" : "before";
 
@@ -301,13 +305,19 @@ export function ExpenseFilters({
         <p className="text-xs text-slate-500 dark:text-slate-400">
           Showing{" "}
           <span className="font-mono font-bold tabular-nums text-slate-900 dark:text-slate-100">
-            {filteredCount}
-          </span>{" "}
-          of{" "}
-          <span className="font-mono font-bold tabular-nums text-slate-900 dark:text-slate-100">
-            {totalCount}
+            {filteredCount === 0
+              ? "0 of 0"
+              : pageStartItem !== undefined && pageEndItem !== undefined
+              ? `${pageStartItem}–${pageEndItem} of ${filteredCount}`
+              : `${filteredCount} of ${totalCount}`}
           </span>{" "}
           activity items
+          {totalCount !== filteredCount && filteredCount > 0 && (
+            <span className="text-slate-400 dark:text-slate-500 font-normal">
+              {" "}
+              ({totalCount} total)
+            </span>
+          )}
         </p>
 
         <div className="flex items-center gap-2">

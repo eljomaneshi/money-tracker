@@ -71,6 +71,21 @@ input[type="date"] {
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
-  appearance: auto;
-  -webkit-appearance: none;
+  color-scheme: light;
+}
+
+.dark input[type="date"] {
+  color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.75;
+  padding: 4px;
+  border-radius: 8px;
+  transition: opacity 0.15s ease;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
 }

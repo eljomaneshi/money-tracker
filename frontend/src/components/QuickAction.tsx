@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -62,15 +63,23 @@ const actionOptions: ActionOption[] = [
 export function QuickAction({ variant = "sidebar", className = "" }: QuickActionProps) {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // Close on Escape key
+  const closeModal = () => {
+    setIsOpen(false);
+    setTimeout(() => {
+      triggerRef.current?.focus();
+    }, 0);
+  };
+
+  // Close on Escape key and return focus
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setIsOpen(false);
+        closeModal();
       }
     };
 
@@ -78,15 +87,15 @@ export function QuickAction({ variant = "sidebar", className = "" }: QuickAction
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen]);
 
-  // Lock body scroll when open
+  // Lock body scroll when open and restore previous overflow value on close/unmount
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
+    if (!isOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow = previousOverflow;
     };
   }, [isOpen]);
 
@@ -95,11 +104,110 @@ export function QuickAction({ variant = "sidebar", className = "" }: QuickAction
     navigate(to);
   };
 
+  const modalContent = isOpen ? (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="quick-action-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+    >
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity"
+        onClick={closeModal}
+        aria-hidden="true"
+      />
+
+      {/* Modal Card */}
+      <div
+        ref={modalRef}
+        className="relative z-10 w-full max-w-lg rounded-[28px] border border-slate-200 bg-white p-6 shadow-2xl transition-all duration-200 dark:border-white/10 dark:bg-[#0d1526] text-slate-900 dark:text-slate-100 sm:p-7"
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-100 dark:border-white/5">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                Quick Action
+              </span>
+            </div>
+            <h3
+              id="quick-action-title"
+              className="mt-1 text-xl font-extrabold tracking-tight text-slate-900 dark:text-white"
+            >
+              Create a new record
+            </h3>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              Select what you would like to record in your workspace
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={closeModal}
+            className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            aria-label="Close dialog"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Options List */}
+        <div className="mt-4 grid gap-2.5">
+          {actionOptions.map((option) => {
+            const Icon = option.icon;
+
+            return (
+              <button
+                key={option.title}
+                type="button"
+                onClick={() => handleSelect(option.to)}
+                className="group flex w-full items-center gap-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 p-3.5 text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-emerald-500/30 hover:bg-emerald-500/[0.04] hover:shadow-md dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-emerald-500/30 dark:hover:bg-emerald-500/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+              >
+                <div
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105 ${option.colorClass}`}
+                >
+                  <Icon className="h-5 w-5" />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                      {option.title}
+                    </span>
+                    {option.badge && (
+                      <span className="rounded-full bg-slate-200/60 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                        {option.badge}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 truncate">
+                    {option.description}
+                  </p>
+                </div>
+
+                <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-emerald-500" />
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-5 pt-3 border-t border-slate-100 dark:border-white/5 text-center">
+          <span className="text-[11px] text-slate-400 dark:text-slate-500">
+            Press <kbd className="rounded border border-slate-200 bg-slate-100 px-1 py-0.5 font-mono text-[10px] dark:border-white/10 dark:bg-white/5">Esc</kbd> to dismiss at any time
+          </span>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <>
       {/* Trigger Button */}
       {variant === "sidebar" ? (
         <button
+          ref={triggerRef}
           type="button"
           onClick={() => setIsOpen(true)}
           aria-haspopup="dialog"
@@ -114,6 +222,7 @@ export function QuickAction({ variant = "sidebar", className = "" }: QuickAction
         </button>
       ) : (
         <button
+          ref={triggerRef}
           type="button"
           onClick={() => setIsOpen(true)}
           aria-haspopup="dialog"
@@ -126,104 +235,9 @@ export function QuickAction({ variant = "sidebar", className = "" }: QuickAction
         </button>
       )}
 
-      {/* Modal Dialog */}
-      {isOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="quick-action-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
-        >
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity"
-            onClick={() => setIsOpen(false)}
-            aria-hidden="true"
-          />
-
-          {/* Modal Card */}
-          <div
-            ref={modalRef}
-            className="relative z-10 w-full max-w-lg rounded-[28px] border border-slate-200 bg-white p-6 shadow-2xl transition-all duration-200 dark:border-white/10 dark:bg-[#0d1526] text-slate-900 dark:text-slate-100 sm:p-7"
-          >
-            {/* Header */}
-            <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-100 dark:border-white/5">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                    Quick Action
-                  </span>
-                </div>
-                <h3
-                  id="quick-action-title"
-                  className="mt-1 text-xl font-extrabold tracking-tight text-slate-900 dark:text-white"
-                >
-                  Create a new record
-                </h3>
-                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                  Select what you would like to record in your workspace
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-                aria-label="Close dialog"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Options List */}
-            <div className="mt-4 grid gap-2.5">
-              {actionOptions.map((option) => {
-                const Icon = option.icon;
-
-                return (
-                  <button
-                    key={option.title}
-                    type="button"
-                    onClick={() => handleSelect(option.to)}
-                    className="group flex w-full items-center gap-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 p-3.5 text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-emerald-500/30 hover:bg-emerald-500/[0.04] hover:shadow-md dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-emerald-500/30 dark:hover:bg-emerald-500/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
-                  >
-                    <div
-                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105 ${option.colorClass}`}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                          {option.title}
-                        </span>
-                        {option.badge && (
-                          <span className="rounded-full bg-slate-200/60 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
-                            {option.badge}
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 truncate">
-                        {option.description}
-                      </p>
-                    </div>
-
-                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-emerald-500" />
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mt-5 pt-3 border-t border-slate-100 dark:border-white/5 text-center">
-              <span className="text-[11px] text-slate-400 dark:text-slate-500">
-                Press <kbd className="rounded border border-slate-200 bg-slate-100 px-1 py-0.5 font-mono text-[10px] dark:border-white/10 dark:bg-white/5">Esc</kbd> to dismiss at any time
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
+      {typeof document !== "undefined" && modalContent
+        ? createPortal(modalContent, document.body)
+        : modalContent}
     </>
   );
 }
