@@ -3,7 +3,7 @@
 ## 1. Repository & Git State
 - **Repository:** `eljomaneshi/money-tracker`
 - **Branch:** `main`
-- **Latest pushed commit:** `87f176d feat(settings): add opt-in privacy-preserving Claude financial insights`
+- **Latest pushed commit:** `5caddf0 feat(ui): v2 Phase 2 — app shell and navigation overhaul`
 - **Local branch state:** Synchronized with `origin/main`.
 - **Working tree:** Clean (except unstaged `docs/ANTIGRAVITY-CONTINUATION.md`).
 - **Rule:** Do not deploy without explicit later approval.
@@ -250,6 +250,50 @@ Task 11 was implemented, reviewed locally, verified with clean builds, committed
 - Confirmed only the four approved files were included in commit `87f176d`.
 - Task 11 was committed as `87f176d` and pushed to `origin/main`.
 
+### Commit c216aac — Task v2 Phase 1: Design Tokens, UI Primitives & Route Code-Splitting
+Task v2 Phase 1 was implemented, reviewed locally, verified with clean builds, committed, and pushed to `main`.
+**Files changed in commit `c216aac`:**
+- `frontend/index.html` (modified)
+- `frontend/src/index.css` (modified)
+- `frontend/src/App.tsx` (modified)
+- `frontend/src/pages/Expenses.tsx` (modified)
+- `frontend/src/components/ui/` (11 new primitives: `Badge.tsx`, `Button.tsx`, `Card.tsx`, `Dialog.tsx`, `EmptyState.tsx`, `GlassCard.tsx`, `Input.tsx`, `Select.tsx`, `Skeleton.tsx`, `StatCard.tsx`, `index.ts`)
+
+**Delivered behavior:**
+- **Typography & Font Tokens:** Added Google Fonts `Plus Jakarta Sans` (UI text) and `JetBrains Mono` (numeric tabular figures) with `display=swap` and preconnect tags.
+- **Tailwind v4 Theme Tokens:** Configured `@theme` tokens in `index.css` for Obsidian canvas (`--color-obsidian-950` to `700`), Mint telemetry accents (`--color-mint-400` to `600`), Coral spend accents (`--color-coral-400` to `600`), and subtle elevation shadows (`--shadow-card`, `--shadow-glow-mint`).
+- **Atomic UI Primitives:** Created 10 reusable UI primitives matching precision FinTech design patterns with complete dark mode and keyboard accessibility support.
+- **Route Code-Splitting:** Split all application routes in `App.tsx` via `React.lazy()` with a branded `Skeleton` loading fallback.
+- **PDF Export Isolation:** Replaced static imports of `jspdf` and `jspdf-autotable` in `Expenses.tsx` with dynamic `import()` to isolate 430 kB of PDF parsing code into deferred chunks. Initial bundle dropped from 931.65 kB to 198.17 kB (a 78.7% reduction).
+
+**Verification performed:**
+- `npm run build` (`tsc -b && vite build`) passed with exit code 0.
+- `git diff --check` passed with 0 errors or whitespace issues.
+- Committed as `c216aac` and pushed to `origin/main`.
+
+### Commit 5caddf0 — Task v2 Phase 2: App Shell & Navigation Overhaul
+Task v2 Phase 2 was implemented, reviewed locally, verified with clean builds, committed, and pushed to `main`.
+**Files changed in commit `5caddf0`:**
+- `frontend/src/components/MobileBottomNav.tsx` (new)
+- `frontend/src/components/QuickAction.tsx` (new)
+- `frontend/src/components/Layout.tsx` (modified)
+- `frontend/src/components/AuthShell.tsx` (modified)
+
+**Delivered behavior:**
+- **Obsidian Desktop Sidebar:** Migrated desktop sidebar in `Layout.tsx` to Obsidian palette (`#070b14`), hairline border (`border-white/8`), active mint badges with glowing indicators, and a streamlined workspace footer.
+- **Mobile Bottom Navigation Dock:** Created `MobileBottomNav.tsx` with frosted glass (`bg-white/90 backdrop-blur-xl dark:bg-[#070b14]/90`), safe-area bottom padding (`env(safe-area-inset-bottom)`), 4 primary destinations (`/dashboard`, `/balances`, `/activity`, `/subscriptions`), and a slide-up "More" sheet for `/notes`, `/settings`, Feedback & Support, Appearance (ThemeToggle), and Logout. Dismissible via `Escape` key and backdrop click.
+- **Quick Action ("+ New") Trigger:** Created `QuickAction.tsx` supporting full-width sidebar and compact mobile header variants. Displays an accessible modal dialog offering 1-click shortcuts to Log an Expense (`/activity`), Add an Account (`/balances`), Track Subscription (`/subscriptions`), and Write a Note (`/notes`).
+- **Streamlined Mobile Top Bar:** Replaced legacy mobile hamburger drawer in `Layout.tsx` with a low-profile header containing brand logo, `<QuickAction variant="compact" />`, and `<ThemeToggle />`.
+- **Main View Safe Padding:** Added `pb-28 lg:pb-8` to `<main>` in `Layout.tsx` so mobile pages are never occluded by the bottom navigation dock.
+- **AuthShell Refresh:** Upgraded marketing panel in `AuthShell.tsx` to Obsidian `#070b14` with ambient radial gradients, subtle grid lines, Plus Jakarta typography, and glassmorphic cards, while modernizing the right form container with `rounded-[32px]` and dark mode contrast.
+- **Scope & Safety:** Preserved all existing routes, auth redirection, and logout logic. Zero backend, database schema, migration, or external dependency changes.
+
+**Verification performed:**
+- `npm run build` (`tsc -b && vite build`) passed with exit code 0.
+- `git diff --check` passed with 0 errors or whitespace issues.
+- `git diff --stat`: `4 files changed, 698 insertions(+), 183 deletions(-)`.
+- Committed as `5caddf0` and pushed to `origin/main`.
+
 ---
 
 ## 3. Local Development Verified
@@ -302,22 +346,29 @@ The local development environment has been tested and verified operational:
 9. Safe personal data export in JSON and CSV formats (`e27c6d0`).
 10. Database connectivity verification in `/health` endpoint (`4064fe0`).
 11. Opt-in, privacy-preserving Claude feature using minimized aggregate data only (`87f176d`).
+12. Task v2 Phase 1: Design tokens, UI primitives & route code-splitting (`c216aac`).
+13. Task v2 Phase 2: App shell and navigation overhaul (`5caddf0`).
 
-### Next Planned Task (Not Yet Approved or Implemented):
-12. **Only after product improvements are complete, prepare truthful Claude Startup application materials:**
-   - Review existing project achievements, verified architectural transitions (PostgreSQL, Supabase, Railway, Resend, Docker, privacy-preserving Claude insights), and draft truthful, grounded application responses.
-   - Boundaries: Read-only audit and plan first; do not invent fictional metrics, false user numbers, or unverified claims; await explicit user approval before authoring documents.
+### Active Redesign Roadmap (Task v2 — Privacy-First FinTech UI):
+- **Phase 1 (Completed — `c216aac`):** Design tokens (`index.css`), atomic UI primitives (`src/components/ui/*`), route code-splitting (`App.tsx`), and dynamic import PDF isolation.
+- **Phase 2 (Completed — `5caddf0`):** Obsidian desktop sidebar, mobile bottom navigation dock (`MobileBottomNav.tsx`), QuickAction global trigger (`QuickAction.tsx`), AuthShell refresh.
+- **Phase 3 (Next Planned):** Dashboard & Balances Views (StatCard metric counters, modern balance cards, actionable dialogs).
+- **Phase 4 (Pending):** Activity & Subscriptions Views (Transactions table, badge filters, recurring billing telemetry).
+- **Phase 5 (Pending):** Notes & Settings Views (Obsidian notes grid, security controls, AI insights cards).
+- **Phase 6 (Pending):** Public Trust Pages & Final Polish (Landing, Privacy, Terms, Security, final performance audit).
 
-### Future Tasks (One at a Time):
-- None currently planned — all 12 roadmap items will be fulfilled once Task 12 is completed.
+### Final Planned Task (After UI Modernization):
+- **Claude for Startups application materials:**
+  - Review existing project achievements, verified architectural transitions (PostgreSQL, Supabase, Railway, Resend, Docker, privacy-preserving Claude insights, v2 UI), and draft truthful, grounded application responses.
+  - Boundaries: Read-only audit and plan first; do not invent fictional metrics, false user numbers, or unverified claims; await explicit user approval before authoring documents.
 
 ---
 
-## 6. Next-Task Boundaries (Task 12)
-- Must begin with a read-only audit of existing application capabilities, architecture documentation, and roadmap milestones before preparing any application drafts.
-- Must wait for explicit user approval before authoring or modifying any files.
-- Must ground all statements in verified factual details from the repository (honest valuation, real features, verified privacy model).
-- Must not alter application code, database schema, migrations, dependencies, deployment settings, or secret files.
+## 6. Next-Task Boundaries (Task v2 Phase 3: Dashboard & Balances Views)
+- Must begin with a read-only audit of `frontend/src/pages/Dashboard.tsx` and `frontend/src/pages/Balance.tsx`.
+- Must not modify application code until user explicitly approves the Phase 3 implementation plan.
+- Must preserve all existing data-fetching logic, calculations, modals, and endpoints.
+- Must not alter backend code, database schema, migrations, or add external npm dependencies.
 
 ---
 
