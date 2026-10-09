@@ -3,7 +3,7 @@
 ## 1. Repository & Git State
 - **Repository:** `eljomaneshi/money-tracker`
 - **Branch:** `main`
-- **Latest pushed commit:** `e140c01 feat(ui): v2 Phase 3 — dashboard and balances views overhaul`
+- **Latest pushed commit:** `2cb4df7 feat(ui): v2 Phase 4 — activity and subscriptions views overhaul`
 - **Local branch state:** Synchronized with `origin/main`.
 - **Working tree:** Clean (except unstaged `docs/ANTIGRAVITY-CONTINUATION.md`).
 - **Rule:** Do not deploy without explicit later approval.
@@ -323,6 +323,36 @@ Task v2 Phase 3 was implemented, reviewed locally, verified with clean builds, c
 - `git diff --stat`: `8 files changed, 1139 insertions(+), 970 deletions(-)`.
 - Committed as `e140c01` and pushed to `origin/main`.
 
+### Commit 2cb4df7 — Task v2 Phase 4: Activity & Subscriptions Views Overhaul
+Task v2 Phase 4 was implemented, reviewed locally, verified with clean builds, committed, and pushed to `main`.
+**Files changed in commit `2cb4df7`:**
+- `frontend/src/components/activity/ActivityLedgerTable.tsx` (new)
+- `frontend/src/components/activity/EditExpenseDialog.tsx` (new)
+- `frontend/src/components/activity/ExpenseFilters.tsx` (new)
+- `frontend/src/components/subscriptions/RenewalTimeline.tsx` (new)
+- `frontend/src/components/subscriptions/SubscriptionCard.tsx` (new)
+- `frontend/src/pages/Expenses.tsx` (modified)
+- `frontend/src/pages/Subscriptions.tsx` (modified)
+
+**Delivered behavior:**
+- **Activity & Transaction Ledger Table:** Extracted `ActivityLedgerTable.tsx` rendering a high-precision financial ledger table for desktop and modular card tiles for mobile with `JetBrains Mono` tabular figures, directional amount color-coding (rose spend, emerald deposit, amber withdrawal, blue transfer), category/type status `Badge` indicators, and converted secondary currency values.
+- **Filter Ledger Bar & Real-Time Cashflow Telemetry:** Extracted `ExpenseFilters.tsx` featuring category and account selectors, responsive date preset chips (`All time`, `Today`, `Yesterday`, `This month`, `Last month`, `Custom range`), activity type filter chips, active filter counter badge, filter reset button, and real-time cashflow telemetry banner calculating converted Expenses, Deposits, Net Cashflow (`+` / `−`), and Transfers Out.
+- **Accessible Edit Expense Dialog:** Extracted `EditExpenseDialog.tsx` wrapping the accessible v2 `Dialog` primitive with body scroll locking, Escape key dismissal, form validation, and dark mode contrast tokens.
+- **Dynamic PDF Export Isolation Preserved:** 100% of PDF export logic with lazy-loaded dynamic imports (`jspdf` and `jspdf-autotable`) remains functional and fully code-split without impacting the core bundle.
+- **Subscriptions Renewal Timeline Telemetry:** Extracted `RenewalTimeline.tsx` calculating normalized monthly outflow commitments, upcoming renewals due within 7 days, renewals due within 30 days, active service counts, and an immediate next renewal alert pill showing the earliest upcoming renewal service name, amount, and formatted date.
+- **Modular Subscription Cards:** Extracted `SubscriptionCard.tsx` rendering desktop table rows and mobile cards with renewal status badges, billing cadence tags, "Due soon" alert indicators, and accessible cancellation triggers with loading states.
+- **Active & Cancelled Tabbed Navigation:** Added segmented tab controls with live count badges on `Subscriptions.tsx` for clean organization.
+- **Shimmer Skeleton Loading:** Replaced legacy plain text `"Loading..."` with animated v2 `Skeleton` shimmer placeholders across both primary views.
+- **Empty State Continuity:** Maintained actionable empty states with smooth scrolling and input focus triggers for first-time onboarding.
+- **Scope & Safety:** Zero backend changes, zero database schema or migration modifications, zero new dependencies, and zero changes to other pages.
+
+**Verification performed:**
+- `npm run build` (`tsc -b && vite build`) passed with exit code 0.
+- `npm --prefix backend/follow-the-money-api run build` passed with exit code 0.
+- `git diff --check` passed with 0 errors or whitespace issues.
+- `git diff --stat`: `7 files changed, 2020 insertions(+), 1186 deletions(-)`.
+- Committed as `2cb4df7` and pushed to `origin/main`.
+
 ---
 
 ## 3. Local Development Verified
@@ -378,13 +408,14 @@ The local development environment has been tested and verified operational:
 12. Task v2 Phase 1: Design tokens, UI primitives & route code-splitting (`c216aac`).
 13. Task v2 Phase 2: App shell and navigation overhaul (`5caddf0`).
 14. Task v2 Phase 3: Dashboard and balances views overhaul (`e140c01`).
+15. Task v2 Phase 4: Activity and subscriptions views overhaul (`2cb4df7`).
 
 ### Active Redesign Roadmap (Task v2 — Privacy-First FinTech UI):
 - **Phase 1 (Completed — `c216aac`):** Design tokens (`index.css`), atomic UI primitives (`src/components/ui/*`), route code-splitting (`App.tsx`), and dynamic import PDF isolation.
 - **Phase 2 (Completed — `5caddf0`):** Obsidian desktop sidebar, mobile bottom navigation dock (`MobileBottomNav.tsx`), QuickAction global trigger (`QuickAction.tsx`), AuthShell refresh.
 - **Phase 3 (Completed — `e140c01`):** Dashboard & Balances Views (StatCard metric counters, modern balance cards, actionable dialogs).
-- **Phase 4 (Next Planned):** Activity & Subscriptions Views (Transactions table, badge filters, recurring billing telemetry).
-- **Phase 5 (Pending):** Notes & Settings Views (Obsidian notes grid, security controls, AI insights cards).
+- **Phase 4 (Completed — `2cb4df7`):** Activity & Subscriptions Views (Transactions table, badge filters, recurring billing telemetry).
+- **Phase 5 (Next Planned):** Notes & Settings Views (Obsidian notes grid, security controls, AI insights cards).
 - **Phase 6 (Pending):** Public Trust Pages & Final Polish (Landing, Privacy, Terms, Security, final performance audit).
 
 ### Final Planned Task (After UI Modernization):
@@ -394,10 +425,11 @@ The local development environment has been tested and verified operational:
 
 ---
 
-## 6. Next-Task Boundaries (Task v2 Phase 4: Activity & Subscriptions Views)
-- Must begin with a read-only audit of `frontend/src/pages/Expenses.tsx` and `frontend/src/pages/Subscriptions.tsx`.
-- Must not modify application code until user explicitly approves the Phase 4 implementation plan.
-- Must preserve all existing transaction filtering, pagination, PDF export isolation, subscription billing recurrence calculation, and action modals.
+## 6. Next-Task Boundaries (Task v2 Phase 5: Notes & Settings Views)
+- Must begin with a read-only audit of `frontend/src/pages/Notes.tsx` and `frontend/src/pages/Settings.tsx`.
+- Must not modify application code until user explicitly approves the Phase 5 implementation plan.
+- Must preserve all note filtering, search, and CRUD operations.
+- Must preserve all Settings functionality: password updates, notification preferences, data portability (JSON/CSV exports), Claude AI insights (opt-in consent, preview, generate, revoke), and account deletion guard.
 - Must not alter backend code, database schema, migrations, or add external npm dependencies.
 
 ---
