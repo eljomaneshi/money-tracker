@@ -3,7 +3,7 @@
 ## 1. Repository & Git State
 - **Repository:** `eljomaneshi/money-tracker`
 - **Branch:** `main`
-- **Latest pushed commit:** `5caddf0 feat(ui): v2 Phase 2 — app shell and navigation overhaul`
+- **Latest pushed commit:** `e140c01 feat(ui): v2 Phase 3 — dashboard and balances views overhaul`
 - **Local branch state:** Synchronized with `origin/main`.
 - **Working tree:** Clean (except unstaged `docs/ANTIGRAVITY-CONTINUATION.md`).
 - **Rule:** Do not deploy without explicit later approval.
@@ -292,7 +292,36 @@ Task v2 Phase 2 was implemented, reviewed locally, verified with clean builds, c
 - `npm run build` (`tsc -b && vite build`) passed with exit code 0.
 - `git diff --check` passed with 0 errors or whitespace issues.
 - `git diff --stat`: `4 files changed, 698 insertions(+), 183 deletions(-)`.
-- Committed as `5caddf0` and pushed to `origin/main`.
+### Commit e140c01 — Task v2 Phase 3: Dashboard & Balances Views Overhaul
+Task v2 Phase 3 was implemented, reviewed locally, verified with clean builds, committed, and pushed to `main`.
+**Files changed in commit `e140c01`:**
+- `frontend/src/components/OnboardingChecklist.tsx` (modified)
+- `frontend/src/pages/Balance.tsx` (modified)
+- `frontend/src/pages/Dashboard.tsx` (modified)
+- `frontend/src/utils/formatMoney.ts` (modified)
+- `frontend/src/components/balances/AccountActionDialog.tsx` (new)
+- `frontend/src/components/balances/AccountCard.tsx` (new)
+- `frontend/src/components/balances/EditAccountDialog.tsx` (new)
+- `frontend/src/components/balances/ViewSwitcher.tsx` (new)
+
+**Delivered behavior:**
+- **Dashboard Hero Banner:** Redesigned hero balance banner with dual-currency support, `JetBrains Mono` tabular figures, Obsidian card tokens (`dark:bg-[#0d1526]`, `dark:border-white/10`), ambient radial glow, and `Skeleton` shimmer loading states (eliminating legacy plain-text "Loading...").
+- **Dashboard Telemetry Metric Cards:** Replaced private inline `StatCard` helper with atomic `src/components/ui/StatCard.tsx` and `Skeleton.tsx` for Subscription Overview, Expenses This Month (coral accent), and Top Spending Category (amber accent).
+- **Onboarding Checklist Modernization:** Upgraded container styling in `OnboardingChecklist.tsx` to Obsidian palette (`dark:bg-[#0d1526]`, `dark:border-white/10`) with glowing mint progress bar and button hover states while preserving live-derived step completion and user-scoped dismissal.
+- **Combined Balances Hero Card:** Overhauled combined balance overview on `Balance.tsx` with Obsidian tokens, dual-currency tabular numbers, and shimmer loading state.
+- **Quick Action Trigger Cards:** Redesigned Deposit, Withdraw, and Transfer trigger cards with interactive v2 card styling, telemetry icons (emerald, rose, blue), and smooth hover lifts.
+- **Accessible Action Dialogs:** Replaced hand-rolled fixed overlays with the accessible v2 `Dialog` primitive for both `AccountActionDialog` (Deposit, Withdraw, and cross-currency Transfer) and `EditAccountDialog` (details editing and zero-balance deletion guard).
+- **Add New Account Form:** Encapsulated inline creation form within a v2 `Card` using standard `Input`, `Select`, and `Button` primitives with ref focus preservation.
+- **Account Card Presentations:** Extracted modular `AccountCard.tsx` providing both Comfortable (grid) and Compact (dense tiles) variants with account type `Badge`, `JetBrains Mono` tabular figures, secondary currency converted balances, and reorder controls.
+- **View Switcher:** Extracted `ViewSwitcher.tsx` providing a sleek segmented control for Comfortable, Compact, and Table List view modes with `localStorage` persistence.
+- **Clean Shared Utility:** Centralized `convertAmount` and `ExchangeRates` into `formatMoney.ts` to satisfy React Fast Refresh lint rules.
+- **Scope & Safety:** Preserved 100% of data-fetching endpoints, calculations, exchange rate logic, reorder API contracts, deletion safety rules, and responsive navigation.
+
+**Verification performed:**
+- `npm run build` (`tsc -b && vite build`) passed with exit code 0.
+- `git diff --check` passed with 0 errors or whitespace issues.
+- `git diff --stat`: `8 files changed, 1139 insertions(+), 970 deletions(-)`.
+- Committed as `e140c01` and pushed to `origin/main`.
 
 ---
 
@@ -305,8 +334,8 @@ The local development environment has been tested and verified operational:
 **Verified local behavior:**
 - Local frontend build (`tsc -b && vite build`) passed with exit code 0.
 - Backend started successfully on port 4000.
-- `http://localhost:4000/health` responded with healthy status.
-- Docker PostgreSQL container was running.
+- `http://localhost:4000/health` responded with healthy status (`{ status: "ok", database: "connected" }`).
+- Docker PostgreSQL container was running and healthy.
 - Registration email verification requests were dispatched and accepted by Resend.
 - A new local user registration was completed end-to-end.
 - A newly created local user successfully logged in and accessed the Dashboard.
@@ -348,12 +377,13 @@ The local development environment has been tested and verified operational:
 11. Opt-in, privacy-preserving Claude feature using minimized aggregate data only (`87f176d`).
 12. Task v2 Phase 1: Design tokens, UI primitives & route code-splitting (`c216aac`).
 13. Task v2 Phase 2: App shell and navigation overhaul (`5caddf0`).
+14. Task v2 Phase 3: Dashboard and balances views overhaul (`e140c01`).
 
 ### Active Redesign Roadmap (Task v2 — Privacy-First FinTech UI):
 - **Phase 1 (Completed — `c216aac`):** Design tokens (`index.css`), atomic UI primitives (`src/components/ui/*`), route code-splitting (`App.tsx`), and dynamic import PDF isolation.
 - **Phase 2 (Completed — `5caddf0`):** Obsidian desktop sidebar, mobile bottom navigation dock (`MobileBottomNav.tsx`), QuickAction global trigger (`QuickAction.tsx`), AuthShell refresh.
-- **Phase 3 (Next Planned):** Dashboard & Balances Views (StatCard metric counters, modern balance cards, actionable dialogs).
-- **Phase 4 (Pending):** Activity & Subscriptions Views (Transactions table, badge filters, recurring billing telemetry).
+- **Phase 3 (Completed — `e140c01`):** Dashboard & Balances Views (StatCard metric counters, modern balance cards, actionable dialogs).
+- **Phase 4 (Next Planned):** Activity & Subscriptions Views (Transactions table, badge filters, recurring billing telemetry).
 - **Phase 5 (Pending):** Notes & Settings Views (Obsidian notes grid, security controls, AI insights cards).
 - **Phase 6 (Pending):** Public Trust Pages & Final Polish (Landing, Privacy, Terms, Security, final performance audit).
 
@@ -364,10 +394,10 @@ The local development environment has been tested and verified operational:
 
 ---
 
-## 6. Next-Task Boundaries (Task v2 Phase 3: Dashboard & Balances Views)
-- Must begin with a read-only audit of `frontend/src/pages/Dashboard.tsx` and `frontend/src/pages/Balance.tsx`.
-- Must not modify application code until user explicitly approves the Phase 3 implementation plan.
-- Must preserve all existing data-fetching logic, calculations, modals, and endpoints.
+## 6. Next-Task Boundaries (Task v2 Phase 4: Activity & Subscriptions Views)
+- Must begin with a read-only audit of `frontend/src/pages/Expenses.tsx` and `frontend/src/pages/Subscriptions.tsx`.
+- Must not modify application code until user explicitly approves the Phase 4 implementation plan.
+- Must preserve all existing transaction filtering, pagination, PDF export isolation, subscription billing recurrence calculation, and action modals.
 - Must not alter backend code, database schema, migrations, or add external npm dependencies.
 
 ---
