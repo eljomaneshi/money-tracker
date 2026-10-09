@@ -10,10 +10,10 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import api from "../lib/api";
-import { formatMoney } from "../utils/formatMoney";
+import { formatMoney, convertAmount, type Currency, type ExchangeRates } from "../utils/formatMoney";
 import OnboardingChecklist from "../components/OnboardingChecklist";
+import { StatCard, Skeleton } from "../components/ui";
 
-type Currency = "ALL" | "EUR" | "GBP" | "USD";
 type AccountType = "BANK" | "CASH" | "CRYPTO" | "OTHER";
 type BillingPeriod = "MONTHLY" | "YEARLY";
 type SubscriptionStatus = "ACTIVE" | "CANCELLED";
@@ -45,13 +45,6 @@ type Account = {
   baseCurrency: Currency;
 };
 
-type ExchangeRates = {
-  ALL: number;
-  EUR: number;
-  GBP: number;
-  USD: number;
-};
-
 type UserSettings = {
   email: string;
   fullName: string | null;
@@ -62,82 +55,6 @@ type UserSettings = {
   notifySubscriptionCreated: boolean;
   notifySubscriptionCancelled: boolean;
 };
-
-const convertAmount = (
-  amount: number,
-  from: Currency,
-  to: Currency,
-  rates: ExchangeRates
-) => {
-  if (from === to) return amount;
-
-  const fromRate = from === "EUR" ? 1 : rates[from];
-  const toRate = to === "EUR" ? 1 : rates[to];
-
-  if (
-    !Number.isFinite(amount) ||
-    !Number.isFinite(fromRate) ||
-    !Number.isFinite(toRate) ||
-    fromRate <= 0 ||
-    toRate <= 0
-  ) {
-    return 0;
-  }
-
-  const amountInEur = from === "EUR" ? amount : amount / fromRate;
-  return to === "EUR" ? amountInEur : amountInEur * toRate;
-};
-
-function StatCard({
-  title,
-  value,
-  description,
-  valueColor = "text-slate-900 dark:text-slate-100",
-  loading,
-  error,
-  icon: Icon,
-  iconWrapperClassName,
-}: {
-  title: string;
-  value: string;
-  description: string;
-  valueColor?: string;
-  loading: boolean;
-  error: string;
-  icon: React.ComponentType<{ className?: string }>;
-  iconWrapperClassName: string;
-}) {
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#0f1b3d] sm:p-8">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            {title}
-          </p>
-        </div>
-
-        <div className={`rounded-2xl p-2.5 ${iconWrapperClassName}`}>
-          <Icon className="h-5 w-5" />
-        </div>
-      </div>
-
-      {loading ? (
-        <p className="mt-4 text-sm text-slate-400 dark:text-slate-500">Loading...</p>
-      ) : error ? (
-        <p className="mt-4 text-sm text-red-700 dark:text-red-400">{error}</p>
-      ) : (
-        <>
-          <p className={`mt-4 text-3xl font-extrabold sm:text-4xl ${valueColor}`}>
-            {value}
-          </p>
-          <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
-            {description}
-          </p>
-        </>
-      )}
-    </div>
-  );
-}
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
@@ -301,10 +218,10 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col items-start gap-4">
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400">
               <LayoutDashboard className="h-6 w-6" />
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 sm:text-4xl">
@@ -317,12 +234,12 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <div className="flex w-full justify-center sm:justify-start">
+        <div className="flex w-full sm:w-auto">
           <Link
             to="/activity"
-            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl border border-slate-200/90 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300 dark:border-white/10 dark:bg-[#0d1526] dark:text-slate-200 dark:hover:border-white/20 dark:hover:bg-[#111a30]"
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
               <Plus className="h-4 w-4" />
             </span>
             <span>Add expense</span>
@@ -339,35 +256,44 @@ export default function Dashboard() {
         loading={loading}
       />
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#0f1b3d] sm:p-8">
-        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+      <section className="relative overflow-hidden rounded-[28px] border border-slate-200/90 bg-white p-6 shadow-sm transition-all duration-200 dark:border-white/10 dark:bg-[#0d1526] sm:p-8">
+        {/* Subtle radial ambient glow for Obsidian styling */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-emerald-500/5 blur-3xl dark:bg-emerald-500/10"
+        />
+
+        <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
             <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-teal-100 p-2.5 text-teal-700 dark:bg-teal-950/50 dark:text-teal-300">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
                 <Wallet className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Total balance
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Total Balance
                 </p>
-                <h2 className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100 sm:text-3xl">
-                  Balance
+                <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-2xl">
+                  Net Overview
                 </h2>
               </div>
             </div>
 
             <p className="mt-3 text-sm text-slate-500 dark:text-slate-400 sm:text-base">
-              Total across all your accounts
+              Combined balance across all {accounts.length} active {accounts.length === 1 ? "account" : "accounts"}
             </p>
           </div>
 
           {loading ? (
-            <p className="text-sm text-slate-400 dark:text-slate-500">Loading...</p>
+            <div className="flex flex-col items-start gap-2.5 md:items-end">
+              <Skeleton className="h-10 w-48 rounded-2xl sm:h-12 sm:w-60" />
+              {showSecondCurrency && <Skeleton className="h-6 w-32 rounded-xl" />}
+            </div>
           ) : error ? (
-            <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+            <p className="text-sm font-medium text-rose-600 dark:text-rose-400">{error}</p>
           ) : (
             <div className="flex flex-col items-start gap-2 md:items-end">
-              <p className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 sm:text-4xl">
+              <p className="font-mono text-3xl font-extrabold tracking-tight text-slate-900 tabular-nums dark:text-slate-100 sm:text-4xl lg:text-5xl">
                 {formatMoney(
                   totalBalanceMain,
                   mainCurrency,
@@ -376,13 +302,16 @@ export default function Dashboard() {
               </p>
 
               {showSecondCurrency && (
-                <p className="text-xl font-bold text-teal-700 dark:text-teal-400 sm:text-3xl">
-                  {formatMoney(
-                    totalBalanceSecond,
-                    secondCurrency,
-                    secondCurrency === "ALL" ? "after" : "before"
-                  )}
-                </p>
+                <div className="inline-flex items-center gap-2 rounded-xl bg-teal-50 px-3 py-1 font-mono text-sm font-bold text-teal-700 dark:bg-teal-950/50 dark:text-teal-300">
+                  <span className="text-[11px] font-medium uppercase tracking-wider opacity-75">Secondary</span>
+                  <span className="tabular-nums">
+                    {formatMoney(
+                      totalBalanceSecond,
+                      secondCurrency,
+                      secondCurrency === "ALL" ? "after" : "before"
+                    )}
+                  </span>
+                </div>
               )}
             </div>
           )}
@@ -397,16 +326,16 @@ export default function Dashboard() {
             mainCurrency,
             mainCurrency === "ALL" ? "after" : "before"
           )}
-          description={`Per month • ${formatMoney(
+          description={`Monthly commitment • ${formatMoney(
             yearlySubscriptionsMain,
             mainCurrency,
             mainCurrency === "ALL" ? "after" : "before"
-          )} per year`}
-          valueColor="text-blue-700 dark:text-blue-400"
+          )} / year`}
+          valueColor="text-blue-600 dark:text-blue-400"
           loading={loading}
           error={error}
           icon={Repeat}
-          iconWrapperClassName="bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300"
+          iconBg="bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300"
         />
 
         <StatCard
@@ -416,23 +345,23 @@ export default function Dashboard() {
             mainCurrency,
             mainCurrency === "ALL" ? "after" : "before"
           )}
-          description="Total spending this month"
+          description="Outflow recorded this calendar month"
           valueColor="text-rose-600 dark:text-rose-400"
           loading={loading}
           error={error}
           icon={Receipt}
-          iconWrapperClassName="bg-rose-100 text-rose-600 dark:bg-rose-950/50 dark:text-rose-300"
+          iconBg="bg-rose-100 text-rose-600 dark:bg-rose-950/50 dark:text-rose-300"
         />
 
         <StatCard
-          title="Most Spent"
+          title="Top Spending Category"
           value={topCategory}
-          description="Top category this month"
+          description="Highest spending category this month"
           valueColor="text-slate-900 dark:text-slate-100"
           loading={loading}
           error={error}
           icon={ChartPie}
-          iconWrapperClassName="bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+          iconBg="bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
         />
       </section>
     </div>

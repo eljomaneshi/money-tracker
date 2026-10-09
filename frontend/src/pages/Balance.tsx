@@ -1,44 +1,31 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownLeft,
   ArrowLeftRight,
   ArrowUpRight,
   ChevronDown,
   ChevronUp,
-  LayoutGrid,
-  LayoutList,
-  List,
   Landmark,
   Pencil,
   Plus,
-  Save,
-  Trash2,
   Wallet,
-  X,
 } from "lucide-react";
 import api from "../lib/api";
-import { formatMoney } from "../utils/formatMoney";
-
-type Currency = "ALL" | "EUR" | "GBP" | "USD";
-type AccountType = "BANK" | "CASH" | "CRYPTO" | "OTHER";
-type ActionType = "DEPOSIT" | "WITHDRAWAL" | "TRANSFER";
-type ViewMode = "comfortable" | "compact" | "list";
-
-type Account = {
-  id: number;
-  name: string;
-  type: AccountType;
-  balance: number;
-  baseCurrency: Currency;
-  sortOrder: number;
-};
-
-type ExchangeRates = {
-  ALL: number;
-  EUR: number;
-  GBP: number;
-  USD: number;
-};
+import { formatMoney, convertAmount, type ExchangeRates } from "../utils/formatMoney";
+import {
+  AccountCard,
+  CompactAccountCard,
+  type Account,
+  type AccountType,
+  type Currency,
+} from "../components/balances/AccountCard";
+import {
+  AccountActionDialog,
+  type ActionType,
+} from "../components/balances/AccountActionDialog";
+import { EditAccountDialog } from "../components/balances/EditAccountDialog";
+import { ViewSwitcher, type ViewMode } from "../components/balances/ViewSwitcher";
+import { Button, Card, Input, Select, Skeleton, Badge } from "../components/ui";
 
 type UserSettings = {
   email: string;
@@ -51,238 +38,6 @@ type UserSettings = {
   notifySubscriptionCancelled: boolean;
 };
 
-const convertAmount = (
-  amount: number,
-  from: Currency,
-  to: Currency,
-  rates: ExchangeRates
-) => {
-  if (from === to) return amount;
-
-  const fromRate = from === "EUR" ? 1 : rates[from];
-  const toRate = to === "EUR" ? 1 : rates[to];
-
-  if (
-    !Number.isFinite(amount) ||
-    !Number.isFinite(fromRate) ||
-    !Number.isFinite(toRate) ||
-    fromRate <= 0 ||
-    toRate <= 0
-  ) {
-    return 0;
-  }
-
-  const amountInEur = from === "EUR" ? amount : amount / fromRate;
-  return to === "EUR" ? amountInEur : amountInEur * toRate;
-};
-
-function AccountCard({
-  account,
-  mainCurrency,
-  secondCurrency,
-  showSecondCurrency,
-  rates,
-  onEdit,
-  onMoveUp,
-  onMoveDown,
-  isFirst,
-  isLast,
-}: {
-  account: Account;
-  mainCurrency: Currency;
-  secondCurrency: Currency;
-  showSecondCurrency: boolean;
-  rates: ExchangeRates | null;
-  onEdit: (account: Account) => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  isFirst: boolean;
-  isLast: boolean;
-}) {
-  const convertedMain = rates
-    ? convertAmount(account.balance, account.baseCurrency, mainCurrency, rates)
-    : 0;
-
-  const convertedSecond =
-    rates && showSecondCurrency
-      ? convertAmount(account.balance, account.baseCurrency, secondCurrency, rates)
-      : 0;
-
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-3">
-            <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
-              <Wallet className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="truncate text-xl font-bold text-slate-900 dark:text-slate-100">
-                {account.name}
-              </h3>
-              <p className="mt-1 text-sm uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                {account.type}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="flex flex-col gap-0.5">
-            <button
-              type="button"
-              onClick={onMoveUp}
-              disabled={isFirst}
-              className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-25 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-            >
-              <ChevronUp className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={onMoveDown}
-              disabled={isLast}
-              className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-25 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-            >
-              <ChevronDown className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={() => onEdit(account)}
-            className="inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-600"
-          >
-            <Pencil className="h-4 w-4" />
-            Edit
-          </button>
-        </div>
-      </div>
-
-      <div className="mt-6">
-        <p className="text-sm text-slate-500 dark:text-slate-400">Balance</p>
-        <p className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-slate-100">
-          {formatMoney(
-            account.balance,
-            account.baseCurrency,
-            account.baseCurrency === "ALL" ? "after" : "before"
-          )}
-        </p>
-
-        {rates && account.baseCurrency !== mainCurrency && (
-          <p className="mt-2 text-base font-semibold text-blue-700 dark:text-blue-400">
-            {formatMoney(
-              convertedMain,
-              mainCurrency,
-              mainCurrency === "ALL" ? "after" : "before"
-            )}
-          </p>
-        )}
-
-        {rates &&
-          showSecondCurrency &&
-          secondCurrency !== mainCurrency &&
-          account.baseCurrency !== secondCurrency && (
-            <p className="mt-1 text-sm font-medium text-teal-700 dark:text-teal-400">
-              {formatMoney(
-                convertedSecond,
-                secondCurrency,
-                secondCurrency === "ALL" ? "after" : "before"
-              )}
-            </p>
-          )}
-      </div>
-    </div>
-  );
-}
-
-function CompactCard({
-  account,
-  mainCurrency,
-  rates,
-  onEdit,
-  onMoveUp,
-  onMoveDown,
-  isFirst,
-  isLast,
-}: {
-  account: Account;
-  mainCurrency: Currency;
-  rates: ExchangeRates | null;
-  onEdit: (account: Account) => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  isFirst: boolean;
-  isLast: boolean;
-}) {
-  const convertedMain = rates
-    ? convertAmount(account.balance, account.baseCurrency, mainCurrency, rates)
-    : 0;
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex items-start justify-between gap-2">
-        <div className="rounded-xl bg-blue-100 p-2 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
-          <Wallet className="h-4 w-4" />
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="flex flex-col">
-            <button
-              type="button"
-              onClick={onMoveUp}
-              disabled={isFirst}
-              className="rounded p-0.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-25 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-            >
-              <ChevronUp className="h-3 w-3" />
-            </button>
-            <button
-              type="button"
-              onClick={onMoveDown}
-              disabled={isLast}
-              className="rounded p-0.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-25 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-            >
-              <ChevronDown className="h-3 w-3" />
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={() => onEdit(account)}
-            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-amber-600 dark:hover:bg-slate-800"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
-
-      <div className="mt-3">
-        <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">
-          {account.name}
-        </p>
-        <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
-          {account.type}
-        </p>
-      </div>
-
-      <div className="mt-3">
-        <p className="text-lg font-extrabold text-slate-900 dark:text-slate-100">
-          {formatMoney(
-            account.balance,
-            account.baseCurrency,
-            account.baseCurrency === "ALL" ? "after" : "before"
-          )}
-        </p>
-        {rates && account.baseCurrency !== mainCurrency && (
-          <p className="mt-0.5 text-sm font-semibold text-blue-700 dark:text-blue-400">
-            {formatMoney(
-              convertedMain,
-              mainCurrency,
-              mainCurrency === "ALL" ? "after" : "before"
-            )}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function Balance() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [rates, setRates] = useState<ExchangeRates | null>(null);
@@ -294,11 +49,13 @@ export default function Balance() {
 
   const accountNameInputRef = useRef<HTMLInputElement>(null);
 
+  // New account form state
   const [name, setName] = useState("");
   const [type, setType] = useState<AccountType>("BANK");
   const [balance, setBalance] = useState("");
   const [baseCurrency, setBaseCurrency] = useState<Currency>("EUR");
 
+  // Edit account modal state
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [editName, setEditName] = useState("");
   const [editType, setEditType] = useState<AccountType>("BANK");
@@ -309,10 +66,12 @@ export default function Balance() {
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
+  // View mode
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     return (localStorage.getItem("balance_view_mode") as ViewMode) || "comfortable";
   });
 
+  // Action modal state (Deposit / Withdraw / Transfer)
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [actionType, setActionType] = useState<ActionType>("DEPOSIT");
   const [actionAmount, setActionAmount] = useState("");
@@ -356,24 +115,8 @@ export default function Balance() {
     settings?.secondCurrency && settings.secondCurrency !== mainCurrency
       ? settings.secondCurrency
       : mainCurrency === "ALL"
-        ? "EUR"
-        : "ALL";
-
-  const selectedFromAccount =
-    typeof fromAccountId === "number"
-      ? accounts.find((account) => account.id === fromAccountId) || null
-      : null;
-
-  const selectedToAccount =
-    typeof toAccountId === "number"
-      ? accounts.find((account) => account.id === toAccountId) || null
-      : null;
-
-  const isCrossCurrencyTransfer =
-    actionType === "TRANSFER" &&
-    !!selectedFromAccount &&
-    !!selectedToAccount &&
-    selectedFromAccount.baseCurrency !== selectedToAccount.baseCurrency;
+      ? "EUR"
+      : "ALL";
 
   const totalBalanceMain = useMemo(() => {
     if (!rates) return 0;
@@ -394,21 +137,24 @@ export default function Balance() {
     localStorage.setItem("balance_view_mode", mode);
   };
 
-const moveAccount = (index: number, direction: "up" | "down") => {
-  const newAccounts = [...accounts];
-  const targetIndex = direction === "up" ? index - 1 : index + 1;
-  if (targetIndex < 0 || targetIndex >= newAccounts.length) return;
-  
-  [newAccounts[index], newAccounts[targetIndex]] = [newAccounts[targetIndex], newAccounts[index]];
-  setAccounts(newAccounts);
-  
-  api
-    .patch("/accounts/reorder", { orderedIds: newAccounts.map((a) => a.id) })
-    .catch((err) => {
-      console.error("Reorder failed:", err.response?.data || err); // Added error logging
-      fetchData(); // Revert UI on failure
-    });
-};
+  const moveAccount = (index: number, direction: "up" | "down") => {
+    const newAccounts = [...accounts];
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newAccounts.length) return;
+
+    [newAccounts[index], newAccounts[targetIndex]] = [
+      newAccounts[targetIndex],
+      newAccounts[index],
+    ];
+    setAccounts(newAccounts);
+
+    api
+      .patch("/accounts/reorder", { orderedIds: newAccounts.map((a) => a.id) })
+      .catch((err) => {
+        console.error("Reorder failed:", err.response?.data || err);
+        fetchData();
+      });
+  };
 
   const resetCreateForm = () => {
     setName("");
@@ -422,7 +168,7 @@ const moveAccount = (index: number, direction: "up" | "down") => {
     setError("");
 
     if (!name.trim() || balance === "") {
-      setError("Please fill account name and balance");
+      setError("Please provide both account name and opening balance.");
       return;
     }
 
@@ -514,10 +260,10 @@ const moveAccount = (index: number, direction: "up" | "down") => {
     setActionType(nextType);
     setActionAmount("");
     setTargetAmount("");
-    setActionDate("");
+    setActionDate(new Date().toISOString().slice(0, 10));
     setActionDescription("");
-    setFromAccountId("");
-    setToAccountId("");
+    setFromAccountId(accounts.length > 0 ? accounts[0].id : "");
+    setToAccountId(accounts.length > 1 ? accounts[1].id : "");
     setActionError("");
     setActionModalOpen(true);
   };
@@ -538,9 +284,17 @@ const moveAccount = (index: number, direction: "up" | "down") => {
     setActionError("");
 
     if (!actionAmount || !actionDate) {
-      setActionError("Please fill amount and date");
+      setActionError("Please provide both amount and transaction date.");
       return;
     }
+
+    const selectedFrom = accounts.find((a) => a.id === fromAccountId);
+    const selectedTo = accounts.find((a) => a.id === toAccountId);
+    const isCrossCurrency =
+      actionType === "TRANSFER" &&
+      !!selectedFrom &&
+      !!selectedTo &&
+      selectedFrom.baseCurrency !== selectedTo.baseCurrency;
 
     if (actionType === "TRANSFER") {
       if (!fromAccountId || !toAccountId) {
@@ -551,7 +305,7 @@ const moveAccount = (index: number, direction: "up" | "down") => {
         setActionError("Source and destination accounts must be different");
         return;
       }
-      if (isCrossCurrencyTransfer && !targetAmount) {
+      if (isCrossCurrency && !targetAmount) {
         setActionError("Please enter the received amount for the destination account");
         return;
       }
@@ -584,7 +338,7 @@ const moveAccount = (index: number, direction: "up" | "down") => {
           fromAccountId,
           toAccountId,
           amount: Number(actionAmount),
-          targetAmount: isCrossCurrencyTransfer ? Number(targetAmount) : Number(actionAmount),
+          targetAmount: isCrossCurrency ? Number(targetAmount) : Number(actionAmount),
           date: actionDate,
           description: actionDescription || undefined,
         });
@@ -594,7 +348,7 @@ const moveAccount = (index: number, direction: "up" | "down") => {
       await fetchData();
     } catch (err: any) {
       console.error(err);
-      setActionError(err.response?.data?.error || "Failed to save action");
+      setActionError(err.response?.data?.error || "Failed to record transaction action");
     } finally {
       setActionSubmitting(false);
     }
@@ -602,48 +356,59 @@ const moveAccount = (index: number, direction: "up" | "down") => {
 
   return (
     <div className="space-y-6 sm:space-y-8">
+      {/* Page Title */}
       <div>
         <div className="flex items-center gap-3">
-          <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400">
             <Landmark className="h-6 w-6" />
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 sm:text-4xl">
-            Balances
+            Balances & Accounts
           </h1>
         </div>
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 sm:text-base">
-          Manage your accounts, balances, deposits, withdrawals, and transfers.
+          Manage your accounts, record instant deposits/withdrawals, and execute transfers.
         </p>
       </div>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
-        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+      {/* Net Combined Balance Hero Card */}
+      <section className="relative overflow-hidden rounded-[28px] border border-slate-200/90 bg-white p-6 shadow-sm transition-all duration-200 dark:border-white/10 dark:bg-[#0d1526] sm:p-8">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-emerald-500/5 blur-3xl dark:bg-emerald-500/10"
+        />
+
+        <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
             <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-teal-100 p-2.5 text-teal-700 dark:bg-teal-950/50 dark:text-teal-300">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
                 <Wallet className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Total balance
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Total Balance
                 </p>
-                <h2 className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100 sm:text-3xl">
+                <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-2xl">
                   Overview
                 </h2>
               </div>
             </div>
             <p className="mt-3 text-sm text-slate-500 dark:text-slate-400 sm:text-base">
-              Combined balance across all accounts
+              Combined ledger balance across all {accounts.length} active{" "}
+              {accounts.length === 1 ? "account" : "accounts"}
             </p>
           </div>
 
           {loading ? (
-            <p className="text-sm text-slate-400 dark:text-slate-500">Loading...</p>
+            <div className="flex flex-col items-start gap-2.5 md:items-end">
+              <Skeleton className="h-10 w-48 rounded-2xl sm:h-12 sm:w-60" />
+              {showSecondCurrency && <Skeleton className="h-6 w-32 rounded-xl" />}
+            </div>
           ) : error ? (
-            <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+            <p className="text-sm font-medium text-rose-600 dark:text-rose-400">{error}</p>
           ) : (
             <div className="flex flex-col items-start gap-2 md:items-end">
-              <p className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 sm:text-4xl">
+              <p className="font-mono text-3xl font-extrabold tracking-tight text-slate-900 tabular-nums dark:text-slate-100 sm:text-4xl lg:text-5xl">
                 {formatMoney(
                   totalBalanceMain,
                   mainCurrency,
@@ -651,32 +416,36 @@ const moveAccount = (index: number, direction: "up" | "down") => {
                 )}
               </p>
               {showSecondCurrency && (
-                <p className="text-xl font-bold text-teal-700 dark:text-teal-400 sm:text-3xl">
-                  {formatMoney(
-                    totalBalanceSecond,
-                    secondCurrency,
-                    secondCurrency === "ALL" ? "after" : "before"
-                  )}
-                </p>
+                <div className="inline-flex items-center gap-2 rounded-xl bg-teal-50 px-3 py-1 font-mono text-sm font-bold text-teal-700 dark:bg-teal-950/50 dark:text-teal-300">
+                  <span className="text-[11px] font-medium uppercase tracking-wider opacity-75">Secondary</span>
+                  <span className="tabular-nums">
+                    {formatMoney(
+                      totalBalanceSecond,
+                      secondCurrency,
+                      secondCurrency === "ALL" ? "after" : "before"
+                    )}
+                  </span>
+                </div>
               )}
             </div>
           )}
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {/* Quick Action Triggers Row */}
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <button
           type="button"
           onClick={() => openActionModal("DEPOSIT")}
-          className="inline-flex items-center justify-start gap-3 rounded-3xl border border-slate-200 bg-white px-5 py-5 text-left shadow-sm transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+          className="group relative flex items-center gap-4 rounded-[28px] border border-slate-200/90 bg-white p-5 text-left shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-emerald-300 dark:border-white/10 dark:bg-[#0d1526] dark:hover:border-emerald-500/30 dark:hover:bg-[#111a30]"
         >
-          <div className="rounded-2xl bg-emerald-100 p-2.5 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-            <ArrowDownLeft className="h-5 w-5" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 transition-transform group-hover:scale-105 dark:bg-emerald-950/60 dark:text-emerald-300">
+            <ArrowDownLeft className="h-6 w-6" />
           </div>
-          <div className="text-left">
-            <p className="font-semibold text-slate-900 dark:text-slate-100">Deposit</p>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Add money to an account
+          <div>
+            <p className="text-base font-bold text-slate-900 dark:text-slate-100">Deposit</p>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              Credit funds to an account
             </p>
           </div>
         </button>
@@ -684,15 +453,15 @@ const moveAccount = (index: number, direction: "up" | "down") => {
         <button
           type="button"
           onClick={() => openActionModal("WITHDRAWAL")}
-          className="inline-flex items-center justify-start gap-3 rounded-3xl border border-slate-200 bg-white px-5 py-5 text-left shadow-sm transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+          className="group relative flex items-center gap-4 rounded-[28px] border border-slate-200/90 bg-white p-5 text-left shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-rose-300 dark:border-white/10 dark:bg-[#0d1526] dark:hover:border-rose-500/30 dark:hover:bg-[#111a30]"
         >
-          <div className="rounded-2xl bg-rose-100 p-2.5 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
-            <ArrowUpRight className="h-5 w-5" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-700 transition-transform group-hover:scale-105 dark:bg-rose-950/60 dark:text-rose-300">
+            <ArrowUpRight className="h-6 w-6" />
           </div>
-          <div className="text-left">
-            <p className="font-semibold text-slate-900 dark:text-slate-100">Withdraw</p>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Remove money from an account
+          <div>
+            <p className="text-base font-bold text-slate-900 dark:text-slate-100">Withdraw</p>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              Debit funds from an account
             </p>
           </div>
         </button>
@@ -700,123 +469,125 @@ const moveAccount = (index: number, direction: "up" | "down") => {
         <button
           type="button"
           onClick={() => openActionModal("TRANSFER")}
-          className="inline-flex items-center justify-start gap-3 rounded-3xl border border-slate-200 bg-white px-5 py-5 text-left shadow-sm transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+          className="group relative flex items-center gap-4 rounded-[28px] border border-slate-200/90 bg-white p-5 text-left shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-blue-300 dark:border-white/10 dark:bg-[#0d1526] dark:hover:border-blue-500/30 dark:hover:bg-[#111a30]"
         >
-          <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
-            <ArrowLeftRight className="h-5 w-5" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-700 transition-transform group-hover:scale-105 dark:bg-blue-950/60 dark:text-blue-300">
+            <ArrowLeftRight className="h-6 w-6" />
           </div>
-          <div className="text-left">
-            <p className="font-semibold text-slate-900 dark:text-slate-100">Transfer</p>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Move money between accounts
+          <div>
+            <p className="text-base font-bold text-slate-900 dark:text-slate-100">Transfer</p>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              Move funds between accounts
             </p>
           </div>
         </button>
       </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
-        <div className="mb-6 flex items-start gap-3">
-          <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+      {/* Add New Account Form Card */}
+      <Card padding="md" className="rounded-[28px]">
+        <div className="mb-5 flex items-start gap-3.5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
             <Plus className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+            <h2 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-xl">
               Add New Account
             </h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Create a bank, cash, crypto, or other account.
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
+              Create a bank, cash, crypto, or custom liquidity account.
             </p>
           </div>
         </div>
 
         {error && (
-          <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="mb-5 rounded-2xl border border-rose-200/80 bg-rose-50/80 px-4 py-3 text-xs font-medium text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+          >
             {error}
           </div>
         )}
 
-        <form
-          onSubmit={handleCreateAccount}
-          className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5"
-        >
+        <form onSubmit={handleCreateAccount} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Account Name
-            </label>
-            <input
+            <Input
               ref={accountNameInputRef}
+              label="Account Name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Main Bank"
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+              placeholder="e.g., Primary Bank, Cash Vault"
+              required
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Type
-            </label>
-            <select
+            <Select
+              label="Type"
               value={type}
               onChange={(e) => setType(e.target.value as AccountType)}
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+              required
             >
-              <option value="BANK">Bank</option>
-              <option value="CASH">Cash</option>
-              <option value="CRYPTO">Crypto</option>
+              <option value="BANK">Bank Account</option>
+              <option value="CASH">Cash Wallet</option>
+              <option value="CRYPTO">Crypto Vault</option>
               <option value="OTHER">Other</option>
-            </select>
+            </Select>
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Balance
-            </label>
-            <input
+            <Input
+              label="Opening Balance"
               type="number"
               step="0.01"
               value={balance}
               onChange={(e) => setBalance(e.target.value)}
               placeholder="0.00"
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+              required
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Currency
-            </label>
-            <select
+            <Select
+              label="Base Currency"
               value={baseCurrency}
               onChange={(e) => setBaseCurrency(e.target.value as Currency)}
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+              required
             >
-              <option value="EUR">EUR</option>
-              <option value="USD">USD</option>
-              <option value="GBP">GBP</option>
-              <option value="ALL">ALL</option>
-            </select>
+              <option value="EUR">EUR (€)</option>
+              <option value="USD">USD ($)</option>
+              <option value="GBP">GBP (£)</option>
+              <option value="ALL">ALL (Lek)</option>
+            </Select>
           </div>
 
           <div className="flex items-end">
-            <button
+            <Button
               type="submit"
-              disabled={submitting}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300 dark:disabled:bg-blue-900/40"
+              variant="primary"
+              size="md"
+              className="w-full"
+              isLoading={submitting}
+              leftIcon={<Plus className="h-4 w-4" />}
             >
-              <Plus className="h-4 w-4" />
-              {submitting ? "Adding..." : "Add account"}
-            </button>
+              {submitting ? "Adding..." : "Add Account"}
+            </Button>
           </div>
         </form>
-      </section>
+      </Card>
 
+      {/* Account Collection & Views */}
       <section>
         {loading ? (
-          <p className="text-sm text-slate-400 dark:text-slate-500">Loading...</p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <Skeleton className="h-44 rounded-[28px]" />
+            <Skeleton className="h-44 rounded-[28px]" />
+            <Skeleton className="h-44 rounded-[28px]" />
+          </div>
         ) : accounts.length === 0 ? (
-          <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-12">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+          /* Actionable empty state card */
+          <div className="rounded-[28px] border border-slate-200/90 bg-white p-8 text-center shadow-sm dark:border-white/10 dark:bg-[#0d1526] sm:p-12">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
               <Wallet className="h-7 w-7" aria-hidden="true" />
             </div>
             <h3 className="mt-4 text-lg font-bold text-slate-900 dark:text-slate-100">
@@ -826,71 +597,41 @@ const moveAccount = (index: number, direction: "up" | "down") => {
               Add your bank accounts, cash wallets, or crypto balances to start tracking your net worth and balances.
             </p>
             <div className="mt-6">
-              <button
+              <Button
                 type="button"
+                variant="primary"
+                size="md"
                 onClick={() => {
                   accountNameInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
                   accountNameInputRef.current?.focus();
                 }}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/40"
+                leftIcon={<Plus className="h-4 w-4" />}
               >
-                <Plus className="h-4 w-4" aria-hidden="true" />
                 Add your first account
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
           <>
+            {/* Control Bar: Account count + View Switcher */}
             <div className="mb-4 flex items-center justify-between">
-              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-                {accounts.length} account{accounts.length !== 1 ? "s" : ""}
-              </p>
-              <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-800 dark:bg-slate-900">
-                <button
-                  type="button"
-                  onClick={() => changeViewMode("comfortable")}
-                  title="Comfortable"
-                  className={`rounded-lg p-2 transition ${
-                    viewMode === "comfortable"
-                      ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
-                      : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                  }`}
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => changeViewMode("compact")}
-                  title="Compact"
-                  className={`rounded-lg p-2 transition ${
-                    viewMode === "compact"
-                      ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
-                      : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                  }`}
-                >
-                  <LayoutList className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => changeViewMode("list")}
-                  title="List"
-                  className={`rounded-lg p-2 transition ${
-                    viewMode === "list"
-                      ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
-                      : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                  }`}
-                >
-                  <List className="h-4 w-4" />
-                </button>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  {accounts.length} {accounts.length === 1 ? "Account" : "Accounts"}
+                </p>
+                <span className="text-xs text-slate-400 dark:text-slate-500">• Reorderable</span>
               </div>
+
+              <ViewSwitcher viewMode={viewMode} onChange={changeViewMode} />
             </div>
 
+            {/* Comfortable Grid View */}
             {viewMode === "comfortable" && (
               <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-3">
-                {accounts.map((account, i) => (
+                {accounts.map((acc, i) => (
                   <AccountCard
-                    key={account.id}
-                    account={account}
+                    key={acc.id}
+                    account={acc}
                     mainCurrency={mainCurrency}
                     secondCurrency={secondCurrency}
                     showSecondCurrency={showSecondCurrency}
@@ -905,12 +646,13 @@ const moveAccount = (index: number, direction: "up" | "down") => {
               </div>
             )}
 
+            {/* Compact Grid View */}
             {viewMode === "compact" && (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                {accounts.map((account, i) => (
-                  <CompactCard
-                    key={account.id}
-                    account={account}
+                {accounts.map((acc, i) => (
+                  <CompactAccountCard
+                    key={acc.id}
+                    account={acc}
                     mainCurrency={mainCurrency}
                     rates={rates}
                     onEdit={openEditModal}
@@ -923,63 +665,67 @@ const moveAccount = (index: number, direction: "up" | "down") => {
               </div>
             )}
 
+            {/* Table List View */}
             {viewMode === "list" && (
-              <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <div className="overflow-x-auto rounded-[28px] border border-slate-200/90 bg-white shadow-sm dark:border-white/10 dark:bg-[#0d1526]">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800">
-                      <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    <tr className="border-b border-slate-100 dark:border-white/8 bg-slate-50/50 dark:bg-white/2">
+                      <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                         Account
                       </th>
-                      <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                         Type
                       </th>
-                      <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                         Balance
                       </th>
-                      <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        Converted
+                      <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        Converted ({mainCurrency})
                       </th>
-                      <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {accounts.map((account, i) => (
+                  <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                    {accounts.map((acc, i) => (
                       <tr
-                        key={account.id}
-                        className="border-b border-slate-100 last:border-0 dark:border-slate-800/60"
+                        key={acc.id}
+                        className="transition-colors hover:bg-slate-50/60 dark:hover:bg-white/2"
                       >
                         <td className="px-5 py-4 font-semibold text-slate-900 dark:text-slate-100">
-                          {account.name}
+                          {acc.name}
                         </td>
-                        <td className="px-5 py-4 text-sm uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                          {account.type}
+                        <td className="px-5 py-4">
+                          <Badge variant="neutral" className="text-[11px] uppercase tracking-wider">
+                            {acc.type}
+                          </Badge>
                         </td>
-                        <td className="px-5 py-4 text-right font-bold text-slate-900 dark:text-slate-100">
+                        <td className="px-5 py-4 text-right font-mono font-bold text-slate-900 tabular-nums dark:text-slate-100">
                           {formatMoney(
-                            account.balance,
-                            account.baseCurrency,
-                            account.baseCurrency === "ALL" ? "after" : "before"
+                            acc.balance,
+                            acc.baseCurrency,
+                            acc.baseCurrency === "ALL" ? "after" : "before"
                           )}
                         </td>
-                        <td className="px-5 py-4 text-right font-semibold text-blue-700 dark:text-blue-400">
-                          {rates && account.baseCurrency !== mainCurrency
+                        <td className="px-5 py-4 text-right font-mono font-semibold text-blue-600 dark:text-blue-400 tabular-nums">
+                          {rates && acc.baseCurrency !== mainCurrency
                             ? formatMoney(
-                                convertAmount(account.balance, account.baseCurrency, mainCurrency, rates),
+                                convertAmount(acc.balance, acc.baseCurrency, mainCurrency, rates),
                                 mainCurrency,
                                 mainCurrency === "ALL" ? "after" : "before"
                               )
                             : "—"}
                         </td>
-                        <td className="px-5 py-4">
+                        <td className="px-5 py-4 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <button
                               type="button"
                               onClick={() => moveAccount(i, "up")}
                               disabled={i === 0}
-                              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-25 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                              title="Move up"
+                              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-20 dark:hover:bg-white/10 dark:hover:text-slate-200"
                             >
                               <ChevronUp className="h-4 w-4" />
                             </button>
@@ -987,17 +733,18 @@ const moveAccount = (index: number, direction: "up" | "down") => {
                               type="button"
                               onClick={() => moveAccount(i, "down")}
                               disabled={i === accounts.length - 1}
-                              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-25 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                              title="Move down"
+                              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-20 dark:hover:bg-white/10 dark:hover:text-slate-200"
                             >
                               <ChevronDown className="h-4 w-4" />
                             </button>
                             <button
                               type="button"
-                              onClick={() => openEditModal(account)}
-                              className="ml-1 inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-600"
+                              onClick={() => openEditModal(acc)}
+                              className="ml-1 inline-flex items-center gap-1 rounded-xl border border-slate-200/80 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-white hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
                             >
-                              <Pencil className="h-3 w-3" />
-                              Edit
+                              <Pencil className="h-3 w-3 text-amber-500" />
+                              <span>Edit</span>
                             </button>
                           </div>
                         </td>
@@ -1011,375 +758,50 @@ const moveAccount = (index: number, direction: "up" | "down") => {
         )}
       </section>
 
-      {editingAccount && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900 sm:p-8">
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <div className="rounded-2xl bg-amber-100 p-2.5 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
-                  <Pencil className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 sm:text-2xl">
-                    Edit Account
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Update the account details and balance.
-                  </p>
-                </div>
-              </div>
+      {/* Action Dialog (Deposit / Withdraw / Transfer) */}
+      <AccountActionDialog
+        isOpen={actionModalOpen}
+        onClose={closeActionModal}
+        actionType={actionType}
+        accounts={accounts}
+        amount={actionAmount}
+        setAmount={setActionAmount}
+        targetAmount={targetAmount}
+        setTargetAmount={setTargetAmount}
+        date={actionDate}
+        setDate={setActionDate}
+        description={actionDescription}
+        setDescription={setActionDescription}
+        fromAccountId={fromAccountId}
+        setFromAccountId={setFromAccountId}
+        toAccountId={toAccountId}
+        setToAccountId={setToAccountId}
+        error={actionError}
+        submitting={actionSubmitting}
+        onSubmit={handleActionSubmit}
+      />
 
-              <button
-                type="button"
-                onClick={closeEditModal}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-              >
-                <X className="h-4 w-4" />
-                Close
-              </button>
-            </div>
-
-            {editError && (
-              <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
-                {editError}
-              </div>
-            )}
-
-            <form
-              onSubmit={handleEditSubmit}
-              className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
-            >
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Account Name
-                </label>
-                <input
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Type
-                </label>
-                <select
-                  value={editType}
-                  onChange={(e) => setEditType(e.target.value as AccountType)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                >
-                  <option value="BANK">Bank</option>
-                  <option value="CASH">Cash</option>
-                  <option value="CRYPTO">Crypto</option>
-                  <option value="OTHER">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Balance
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={editBalance}
-                  onChange={(e) => setEditBalance(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Currency
-                </label>
-                <select
-                  value={editBaseCurrency}
-                  onChange={(e) => setEditBaseCurrency(e.target.value as Currency)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                >
-                  <option value="EUR">EUR</option>
-                  <option value="USD">USD</option>
-                  <option value="GBP">GBP</option>
-                  <option value="ALL">ALL</option>
-                </select>
-              </div>
-
-              <div className="flex items-end justify-between gap-3 md:col-span-2 xl:col-span-3">
-                <div>
-                  {!deleteConfirm ? (
-                    <button
-                      type="button"
-                      disabled={Number(editingAccount.balance) !== 0 || deleteSubmitting}
-                      onClick={() => setDeleteConfirm(true)}
-                      title={
-                        Number(editingAccount.balance) !== 0
-                          ? `Balance must be 0 to delete (current: ${editingAccount.balance} ${editingAccount.baseCurrency})`
-                          : "Delete this account"
-                      }
-                      className="inline-flex items-center gap-2 rounded-2xl border border-red-200 px-4 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/30 dark:disabled:border-slate-700 dark:disabled:text-slate-600"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-slate-500 dark:text-slate-400">
-                        Are you sure?
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleDeleteAccount}
-                        disabled={deleteSubmitting}
-                        className="rounded-2xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
-                      >
-                        {deleteSubmitting ? "Deleting..." : "Yes, delete"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeleteConfirm(false)}
-                        className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                      >
-                        No
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={closeEditModal}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                  >
-                    <X className="h-4 w-4" />
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={editSubmitting}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300 dark:disabled:bg-blue-900/40"
-                  >
-                    <Save className="h-4 w-4" />
-                    {editSubmitting ? "Saving..." : "Save changes"}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {actionModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900 sm:p-8">
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <div
-                  className={`rounded-2xl p-2.5 ${
-                    actionType === "DEPOSIT"
-                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                      : actionType === "WITHDRAWAL"
-                        ? "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
-                        : "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
-                  }`}
-                >
-                  {actionType === "DEPOSIT" ? (
-                    <ArrowDownLeft className="h-5 w-5" />
-                  ) : actionType === "WITHDRAWAL" ? (
-                    <ArrowUpRight className="h-5 w-5" />
-                  ) : (
-                    <ArrowLeftRight className="h-5 w-5" />
-                  )}
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 sm:text-2xl">
-                    {actionType === "DEPOSIT"
-                      ? "Deposit Money"
-                      : actionType === "WITHDRAWAL"
-                        ? "Withdraw Money"
-                        : "Transfer Money"}
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    {actionType === "DEPOSIT"
-                      ? "Add funds to one of your accounts."
-                      : actionType === "WITHDRAWAL"
-                        ? "Remove funds from one of your accounts."
-                        : "Move funds between two accounts."}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={closeActionModal}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-              >
-                <X className="h-4 w-4" />
-                Close
-              </button>
-            </div>
-
-            {actionError && (
-              <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
-                {actionError}
-              </div>
-            )}
-
-            <form
-              onSubmit={handleActionSubmit}
-              className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
-            >
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  {actionType === "TRANSFER" ? "Amount Sent" : "Amount"}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={actionAmount}
-                  onChange={(e) => setActionAmount(e.target.value)}
-                  placeholder="100.00"
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                />
-              </div>
-
-              {isCrossCurrencyTransfer && (
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Amount Received
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={targetAmount}
-                    onChange={(e) => setTargetAmount(e.target.value)}
-                    placeholder="9500.00"
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                  />
-                </div>
-              )}
-
-              <div className="min-w-0 overflow-hidden">
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Date
-                </label>
-                <input
-                  type="date"
-                  value={actionDate}
-                  onChange={(e) => setActionDate(e.target.value)}
-                  className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                />
-              </div>
-
-              {actionType === "TRANSFER" ? (
-                <>
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                      From Account
-                    </label>
-                    <select
-                      value={fromAccountId}
-                      onChange={(e) =>
-                        setFromAccountId(e.target.value ? Number(e.target.value) : "")
-                      }
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                    >
-                      <option value="">Select account</option>
-                      {accounts.map((account) => (
-                        <option key={account.id} value={account.id}>
-                          {account.name} ({account.baseCurrency})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                      To Account
-                    </label>
-                    <select
-                      value={toAccountId}
-                      onChange={(e) =>
-                        setToAccountId(e.target.value ? Number(e.target.value) : "")
-                      }
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                    >
-                      <option value="">Select account</option>
-                      {accounts.map((account) => (
-                        <option key={account.id} value={account.id}>
-                          {account.name} ({account.baseCurrency})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {isCrossCurrencyTransfer && selectedFromAccount && selectedToAccount && (
-                    <div className="md:col-span-2 xl:col-span-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
-                      This transfer is between different currencies:{" "}
-                      {selectedFromAccount.baseCurrency} to {selectedToAccount.baseCurrency}.
-                      Enter the real amount received after exchange.
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Account
-                  </label>
-                  <select
-                    value={fromAccountId}
-                    onChange={(e) =>
-                      setFromAccountId(e.target.value ? Number(e.target.value) : "")
-                    }
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                  >
-                    <option value="">Select account</option>
-                    {accounts.map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {account.name} ({account.baseCurrency})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div className="md:col-span-2 xl:col-span-3">
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Description
-                </label>
-                <input
-                  value={actionDescription}
-                  onChange={(e) => setActionDescription(e.target.value)}
-                  placeholder="Optional note for this action"
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-                />
-              </div>
-
-              <div className="flex items-end gap-3 md:col-span-2 xl:col-span-3">
-                <button
-                  type="button"
-                  onClick={closeActionModal}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                >
-                  <X className="h-4 w-4" />
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionSubmitting}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300 dark:disabled:bg-blue-900/40"
-                >
-                  <Save className="h-4 w-4" />
-                  {actionSubmitting ? "Saving..." : "Save action"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Edit Account Dialog */}
+      <EditAccountDialog
+        isOpen={!!editingAccount}
+        onClose={closeEditModal}
+        account={editingAccount}
+        name={editName}
+        setName={setEditName}
+        type={editType}
+        setType={setEditType}
+        balance={editBalance}
+        setBalance={setEditBalance}
+        baseCurrency={editBaseCurrency}
+        setBaseCurrency={setEditBaseCurrency}
+        error={editError}
+        submitting={editSubmitting}
+        deleteConfirm={deleteConfirm}
+        setDeleteConfirm={setDeleteConfirm}
+        deleteSubmitting={deleteSubmitting}
+        onSubmit={handleEditSubmit}
+        onDelete={handleDeleteAccount}
+      />
     </div>
   );
 }

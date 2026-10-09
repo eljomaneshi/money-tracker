@@ -25,3 +25,35 @@ export const formatMoney = (
     ? `${label} ${formatted}`
     : `${formatted} ${label}`;
 };
+
+export type ExchangeRates = {
+  ALL: number;
+  EUR: number;
+  GBP: number;
+  USD: number;
+};
+
+export const convertAmount = (
+  amount: number,
+  from: Currency,
+  to: Currency,
+  rates: ExchangeRates
+) => {
+  if (from === to) return amount;
+
+  const fromRate = from === "EUR" ? 1 : rates[from];
+  const toRate = to === "EUR" ? 1 : rates[to];
+
+  if (
+    !Number.isFinite(amount) ||
+    !Number.isFinite(fromRate) ||
+    !Number.isFinite(toRate) ||
+    fromRate <= 0 ||
+    toRate <= 0
+  ) {
+    return 0;
+  }
+
+  const amountInEur = from === "EUR" ? amount : amount / fromRate;
+  return to === "EUR" ? amountInEur : amountInEur * toRate;
+};
