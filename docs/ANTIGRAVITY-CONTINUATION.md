@@ -3,7 +3,7 @@
 ## 1. Repository & Git State
 - **Repository:** `eljomaneshi/money-tracker`
 - **Branch:** `main`
-- **Latest pushed commit:** `2cb4df7 feat(ui): v2 Phase 4 — activity and subscriptions views overhaul`
+- **Latest pushed commit:** `46fbc2d feat(ui): v2 Phase 5 — notes and settings views overhaul`
 - **Local branch state:** Synchronized with `origin/main`.
 - **Working tree:** Clean (except unstaged `docs/ANTIGRAVITY-CONTINUATION.md`).
 - **Rule:** Do not deploy without explicit later approval.
@@ -353,6 +353,38 @@ Task v2 Phase 4 was implemented, reviewed locally, verified with clean builds, c
 - `git diff --stat`: `7 files changed, 2020 insertions(+), 1186 deletions(-)`.
 - Committed as `2cb4df7` and pushed to `origin/main`.
 
+### Commit 46fbc2d — Task v2 Phase 5: Notes & Settings Views Overhaul
+Task v2 Phase 5 was implemented, reviewed locally, verified with clean builds, committed, and pushed to `main`.
+**Files changed in commit `46fbc2d`:**
+- `frontend/src/components/notes/NoteCard.tsx` (new)
+- `frontend/src/components/notes/NoteEditorDialog.tsx` (new)
+- `frontend/src/components/notes/NoteFilters.tsx` (new)
+- `frontend/src/components/settings/SettingsSection.tsx` (new)
+- `frontend/src/components/settings/ExportDataCard.tsx` (new)
+- `frontend/src/components/settings/AiInsightsCard.tsx` (new)
+- `frontend/src/components/settings/DangerZoneCard.tsx` (new)
+- `frontend/src/pages/Notes.tsx` (modified)
+- `frontend/src/pages/Settings.tsx` (modified)
+
+**Delivered behavior:**
+- **Notes Telemetry & StatCards:** Top metric row with 4 summary `StatCard` indicators (Total Notes, Open Reminders, Pending Receivables, Pending Obligations/Payables) calculating live counts and status.
+- **Notes Search & Multi-Tag Filter Bar:** Extracted `NoteFilters.tsx` providing real-time full-text substring search across titles, descriptions, and person names, combined with interactive Status chips (`All`, `Open`, `Done`, `Cancelled`) and Type chips (`All`, `General`, `To Receive`, `To Pay`, `Reminder`) with dynamic `tabular-nums` counter badges and instant reset.
+- **Obsidian FinTech Note Cards:** Extracted `NoteCard.tsx` rendering Obsidian styled tiles with type badges, status badges, recurrence indicators, amounts in `JetBrains Mono` tabular figures, person metadata, due dates, update timestamps, and accessible edit/delete action triggers.
+- **Accessible Note Editor Dialog:** Extracted `NoteEditorDialog.tsx` wrapping the v2 `Dialog` primitive for both creating and editing financial notes with client-side title and positive amount validation, semantic field grouping, and live error banners.
+- **Settings Section Modular Architecture:** Extracted `SettingsSection.tsx` providing uniform section framing with iconography, descriptive headers, and WAI-ARIA accessible live alerts (`role="status"` and `role="alert"`).
+- **Data Portability & Export Module:** Extracted `ExportDataCard.tsx` with dedicated JSON Archive and CSV Ledger download cards, preserving complete binary blob handling, dynamic filename stamping, rate limit (HTTP 429) messaging, and error blob JSON parsing.
+- **Claude AI Spending Insights Module:** Extracted `AiInsightsCard.tsx` with accessible switch toggle, user-scoped `localStorage` opt-in persistence (`moneytracker_ai_insights_opt_in_${email}`), privacy guarantee checklist, sanitized aggregate JSON inspection dialog, and observation summaries.
+- **Guarded Danger Zone Deletion:** Extracted `DangerZoneCard.tsx` safeguarding irreversible account deletion behind an explicit `"DELETE"` text confirmation modal using v2 `Dialog`.
+- **Shimmer Skeleton Placeholders:** Replaced legacy plain text loading strings across both pages with multi-tile animated `Skeleton` shimmer layouts.
+- **Scope & Safety:** Zero backend changes, zero database schema or migration alterations, zero new dependencies, and zero changes to other application pages.
+
+**Verification performed:**
+- `npm run build` (`tsc -b && vite build`) passed with exit code 0.
+- `npm --prefix backend/follow-the-money-api run build` passed with exit code 0.
+- `git diff --check` passed with 0 errors or whitespace issues.
+- `git diff --stat`: `9 files changed, 2079 insertions(+), 1812 deletions(-)`.
+- Committed as `46fbc2d` and pushed to `origin/main`.
+
 ---
 
 ## 3. Local Development Verified
@@ -409,14 +441,15 @@ The local development environment has been tested and verified operational:
 13. Task v2 Phase 2: App shell and navigation overhaul (`5caddf0`).
 14. Task v2 Phase 3: Dashboard and balances views overhaul (`e140c01`).
 15. Task v2 Phase 4: Activity and subscriptions views overhaul (`2cb4df7`).
+16. Task v2 Phase 5: Notes and settings views overhaul (`46fbc2d`).
 
 ### Active Redesign Roadmap (Task v2 — Privacy-First FinTech UI):
 - **Phase 1 (Completed — `c216aac`):** Design tokens (`index.css`), atomic UI primitives (`src/components/ui/*`), route code-splitting (`App.tsx`), and dynamic import PDF isolation.
 - **Phase 2 (Completed — `5caddf0`):** Obsidian desktop sidebar, mobile bottom navigation dock (`MobileBottomNav.tsx`), QuickAction global trigger (`QuickAction.tsx`), AuthShell refresh.
 - **Phase 3 (Completed — `e140c01`):** Dashboard & Balances Views (StatCard metric counters, modern balance cards, actionable dialogs).
 - **Phase 4 (Completed — `2cb4df7`):** Activity & Subscriptions Views (Transactions table, badge filters, recurring billing telemetry).
-- **Phase 5 (Next Planned):** Notes & Settings Views (Obsidian notes grid, security controls, AI insights cards).
-- **Phase 6 (Pending):** Public Trust Pages & Final Polish (Landing, Privacy, Terms, Security, final performance audit).
+- **Phase 5 (Completed — `46fbc2d`):** Notes & Settings Views (Obsidian notes grid, telemetry StatCards, security controls, AI insights cards).
+- **Phase 6 (Next Planned):** Public Trust Pages & Final Polish (Landing, Privacy, Terms, Security, final performance audit).
 
 ### Final Planned Task (After UI Modernization):
 - **Claude for Startups application materials:**
@@ -425,11 +458,11 @@ The local development environment has been tested and verified operational:
 
 ---
 
-## 6. Next-Task Boundaries (Task v2 Phase 5: Notes & Settings Views)
-- Must begin with a read-only audit of `frontend/src/pages/Notes.tsx` and `frontend/src/pages/Settings.tsx`.
-- Must not modify application code until user explicitly approves the Phase 5 implementation plan.
-- Must preserve all note filtering, search, and CRUD operations.
-- Must preserve all Settings functionality: password updates, notification preferences, data portability (JSON/CSV exports), Claude AI insights (opt-in consent, preview, generate, revoke), and account deletion guard.
+## 6. Next-Task Boundaries (Task v2 Phase 6: Public Trust Pages & Final Polish)
+- Must begin with a read-only audit of `Landing.tsx`, `Privacy.tsx`, `Terms.tsx`, `Security.tsx`, and `TrustPageShell.tsx`.
+- Must not modify application code until user explicitly approves the Phase 6 implementation plan.
+- Must preserve all public marketing copy, privacy disclosures, terms stipulations, and security descriptions.
+- Must ensure design tokens align with the Obsidian v2 design system (`#070b14`, `#0d1526`, mint/coral telemetry accents).
 - Must not alter backend code, database schema, migrations, or add external npm dependencies.
 
 ---
