@@ -1,55 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ArrowLeftRight,
-  Download,
-  Filter,
-  Pencil,
-  Plus,
-  Receipt,
-  Save,
-  TrendingDown,
-  TrendingUp,
-  Wallet,
-  X,
-} from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Receipt } from "lucide-react";
 import api from "../lib/api";
-import { formatMoney } from "../utils/formatMoney";
-
-type Currency = "EUR" | "ALL" | "GBP" | "USD";
-
-type InlineAccount = {
-  id: number;
-  name: string;
-  baseCurrency: Currency;
-};
-
-type Expense = {
-  id: number;
-  amount: number;
-  date: string;
-  category: string;
-  description?: string | null;
-  accountId?: number | null;
-  account?: InlineAccount | null;
-};
-
-type AccountActionType = "DEPOSIT" | "WITHDRAWAL" | "TRANSFER_OUT" | "TRANSFER_IN";
-
-type AccountAction = {
-  id: number;
-  accountId: number;
-  toAccountId?: number | null;
-  type: AccountActionType;
-  amount: number;
-  description?: string | null;
-  date: string;
-  account?: InlineAccount | null;
-  toAccount?: InlineAccount | null;
-};
-
-type ActivityItem =
-  | { itemType: "EXPENSE"; data: Expense }
-  | { itemType: "ACCOUNT_ACTION"; data: AccountAction };
+import { formatMoney, convertAmount, type Currency, type ExchangeRates } from "../utils/formatMoney";
+import {
+  ExpenseFilters,
+  type AccountOption,
+  TYPE_OPTIONS,
+} from "../components/activity/ExpenseFilters";
+import {
+  ActivityLedgerTable,
+  type ActivityItem,
+  type ExpenseItem,
+  type AccountActionItem,
+  type AccountActionType,
+  type InlineAccount,
+} from "../components/activity/ActivityLedgerTable";
+import { EditExpenseDialog } from "../components/activity/EditExpenseDialog";
+import { Button, Card, EmptyState, Input, Select, Skeleton } from "../components/ui";
 
 type Account = {
   id: number;
@@ -57,13 +24,6 @@ type Account = {
   type: "BANK" | "CASH" | "CRYPTO" | "OTHER";
   balance: number;
   baseCurrency: Currency;
-};
-
-type ExchangeRates = {
-  ALL: number;
-  EUR: number;
-  GBP: number;
-  USD: number;
 };
 
 type SettingsResponse = {
@@ -77,56 +37,11 @@ type SettingsResponse = {
   notifySubscriptionCancelled: boolean;
 };
 
-const DATE_PRESETS = [
-  { key: "", label: "All time" },
-  { key: "today", label: "Today" },
-  { key: "yesterday", label: "Yesterday" },
-  { key: "this_month", label: "This month" },
-  { key: "last_month", label: "Last month" },
-  { key: "custom", label: "Custom range" },
-];
-
-const TYPE_OPTIONS = [
-  { key: "EXPENSE", label: "Expenses", active: "bg-rose-600 border-rose-600 text-white", dot: "bg-rose-500" },
-  { key: "SUBSCRIPTION", label: "Subscriptions", active: "bg-violet-600 border-violet-600 text-white", dot: "bg-violet-500" },
-  { key: "DEPOSIT", label: "Deposits", active: "bg-emerald-600 border-emerald-600 text-white", dot: "bg-emerald-500" },
-  { key: "WITHDRAWAL", label: "Withdrawals", active: "bg-amber-500 border-amber-500 text-white", dot: "bg-amber-500" },
-  { key: "TRANSFER_OUT", label: "Transfers out", active: "bg-blue-600 border-blue-600 text-white", dot: "bg-blue-500" },
-  { key: "TRANSFER_IN", label: "Transfers in", active: "bg-cyan-600 border-cyan-600 text-white", dot: "bg-cyan-500" },
-];
-
-const convertAmount = (amount: number, from: Currency, to: Currency, rates: ExchangeRates) => {
-  if (from === to) return amount;
-  const fromRate = from === "EUR" ? 1 : rates[from];
-  const toRate = to === "EUR" ? 1 : rates[to];
-  if (!Number.isFinite(amount) || !Number.isFinite(fromRate) || !Number.isFinite(toRate) || fromRate <= 0 || toRate <= 0) return 0;
-  const amountInEur = from === "EUR" ? amount : amount / fromRate;
-  return to === "EUR" ? amountInEur : amountInEur * toRate;
-};
-
 const moneyPosition = (currency: Currency) => (currency === "ALL" ? "after" : "before");
 
-const inputClass =
-  "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40";
-
-const filterInputClass =
-  "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40";
-
-function SectionDivider({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-3 py-4">
-      <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-      <span className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-        {label}
-      </span>
-      <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-    </div>
-  );
-}
-
 export default function Expenses() {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [accountActions, setAccountActions] = useState<AccountAction[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
+  const [accountActions, setAccountActions] = useState<AccountActionItem[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [rates, setRates] = useState<ExchangeRates | null>(null);
   const [settings, setSettings] = useState<SettingsResponse | null>(null);
@@ -137,6 +52,7 @@ export default function Expenses() {
 
   const amountInputRef = useRef<HTMLInputElement>(null);
 
+  // New expense form state
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState("");
   const [category, setCategory] = useState("Food");
@@ -144,20 +60,18 @@ export default function Expenses() {
   const [selectedAccountId, setSelectedAccountId] = useState<number | "">("");
   const [submitting, setSubmitting] = useState(false);
 
-  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [editAmount, setEditAmount] = useState("");
-  const [editDate, setEditDate] = useState("");
-  const [editCategory, setEditCategory] = useState("Food");
-  const [editDescription, setEditDescription] = useState("");
-  const [editAccountId, setEditAccountId] = useState<number | "">("");
+  // Edit expense state
+  const [editingExpense, setEditingExpense] = useState<ExpenseItem | null>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
 
+  // Filter state
   const [categoryFilter, setCategoryFilter] = useState("");
   const [paidFromFilter, setPaidFromFilter] = useState("");
   const [datePreset, setDatePreset] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -183,14 +97,18 @@ export default function Expenses() {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const mainCurrency: Currency = settings?.totalsMainCurrency || "ALL";
   const showSecondCurrency = settings?.showSecondCurrency ?? true;
   const secondCurrency: Currency =
     settings?.secondCurrency && settings.secondCurrency !== settings.totalsMainCurrency
       ? settings.secondCurrency
-      : settings?.totalsMainCurrency === "ALL" ? "EUR" : "ALL";
+      : settings?.totalsMainCurrency === "ALL"
+      ? "EUR"
+      : "ALL";
 
   const getAccountById = (accountId?: number | null, inline?: InlineAccount | null) => {
     if (!accountId) return inline || null;
@@ -202,13 +120,13 @@ export default function Expenses() {
     return account ? account.name : "—";
   };
 
-  const formatExpenseAmount = (expense: Expense) => {
+  const formatExpenseAmount = (expense: ExpenseItem) => {
     const account = getAccountById(expense.accountId, expense.account);
     const currency = account?.baseCurrency || "EUR";
     return formatMoney(expense.amount, currency, moneyPosition(currency));
   };
 
-  const formatConvertedExpenseAmount = (expense: Expense) => {
+  const formatConvertedExpenseAmount = (expense: ExpenseItem) => {
     if (!rates || !showSecondCurrency) return null;
     const account = getAccountById(expense.accountId, expense.account);
     const sourceCurrency = account?.baseCurrency || "EUR";
@@ -219,11 +137,16 @@ export default function Expenses() {
 
   const getActionLabel = (type: AccountActionType) => {
     switch (type) {
-      case "DEPOSIT": return "Deposit";
-      case "WITHDRAWAL": return "Withdrawal";
-      case "TRANSFER_OUT": return "Transfer out";
-      case "TRANSFER_IN": return "Transfer in";
-      default: return "Action";
+      case "DEPOSIT":
+        return "Deposit";
+      case "WITHDRAWAL":
+        return "Withdrawal";
+      case "TRANSFER_OUT":
+        return "Transfer out";
+      case "TRANSFER_IN":
+        return "Transfer in";
+      default:
+        return "Action";
     }
   };
 
@@ -248,42 +171,56 @@ export default function Expenses() {
 
   const categoryOptions = useMemo(() => {
     return Array.from(
-      new Set(expenses.map((e) => e.category?.trim()).filter(Boolean).sort((a, b) => a!.localeCompare(b!)))
+      new Set(expenses.map((e) => e.category?.trim()).filter(Boolean).sort((a, b) => a.localeCompare(b)))
     ) as string[];
   }, [expenses]);
 
   const activityItems = useMemo<ActivityItem[]>(() => {
     const expenseItems: ActivityItem[] = expenses.map((expense) => ({ itemType: "EXPENSE", data: expense }));
     const actionItems: ActivityItem[] = accountActions.map((action) => ({ itemType: "ACCOUNT_ACTION", data: action }));
-    return [...expenseItems, ...actionItems].sort((a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime());
+    return [...expenseItems, ...actionItems].sort(
+      (a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime()
+    );
   }, [expenses, accountActions]);
 
   const dateRange = useMemo(() => {
     const now = new Date();
-    const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999);
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59, 999);
+
     switch (datePreset) {
-      case "today": return { from: todayStart, to: todayEnd };
+      case "today":
+        return { from: todayStart, to: todayEnd };
       case "yesterday": {
-        const from = new Date(todayStart); from.setDate(from.getDate() - 1);
-        const to = new Date(from); to.setHours(23, 59, 59, 999);
+        const from = new Date(todayStart);
+        from.setDate(from.getDate() - 1);
+        const to = new Date(from);
+        to.setHours(23, 59, 59, 999);
         return { from, to };
       }
-      case "this_month": return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: todayEnd };
-      case "last_month": return {
-        from: new Date(now.getFullYear(), now.getMonth() - 1, 1),
-        to: new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999),
-      };
-      case "custom": return {
-        from: dateFrom ? new Date(dateFrom + "T00:00:00") : null,
-        to: dateTo ? new Date(dateTo + "T23:59:59") : null,
-      };
-      default: return { from: null, to: null };
+      case "this_month":
+        return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: todayEnd };
+      case "last_month":
+        return {
+          from: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+          to: new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999),
+        };
+      case "custom":
+        return {
+          from: dateFrom ? new Date(dateFrom + "T00:00:00") : null,
+          to: dateTo ? new Date(dateTo + "T23:59:59") : null,
+        };
+      default:
+        return { from: null, to: null };
     }
   }, [datePreset, dateFrom, dateTo]);
 
   const toggleType = (key: string) => {
-    setSelectedTypes((prev) => prev.includes(key) ? prev.filter((t) => t !== key) : [...prev, key]);
+    setSelectedTypes((prev) =>
+      prev.includes(key) ? prev.filter((t) => t !== key) : [...prev, key]
+    );
   };
 
   const filteredActivity = useMemo(() => {
@@ -313,7 +250,11 @@ export default function Expenses() {
 
   const totals = useMemo(() => {
     if (!rates) return { expenses: 0, deposits: 0, withdrawals: 0, transfersOut: 0 };
-    let expensesTotal = 0, depositsTotal = 0, withdrawalsTotal = 0, transfersOutTotal = 0;
+    let expensesTotal = 0;
+    let depositsTotal = 0;
+    let withdrawalsTotal = 0;
+    let transfersOutTotal = 0;
+
     filteredActivity.forEach((item) => {
       if (item.itemType === "EXPENSE") {
         const acc = getAccountById(item.data.accountId, item.data.account);
@@ -327,11 +268,16 @@ export default function Expenses() {
         else if (action.type === "TRANSFER_OUT") transfersOutTotal += converted;
       }
     });
-    return { expenses: expensesTotal, deposits: depositsTotal, withdrawals: withdrawalsTotal, transfersOut: transfersOutTotal };
-  }, [filteredActivity, rates, mainCurrency]);
+
+    return {
+      expenses: expensesTotal,
+      deposits: depositsTotal,
+      withdrawals: withdrawalsTotal,
+      transfersOut: transfersOutTotal,
+    };
+  }, [filteredActivity, rates, mainCurrency, accounts]);
 
   const netCashflow = totals.deposits - totals.expenses - totals.withdrawals;
-
   const activeFilterCount = [categoryFilter, paidFromFilter, datePreset, ...selectedTypes].filter(Boolean).length;
   const hasActiveFilters = activeFilterCount > 0;
 
@@ -360,150 +306,177 @@ export default function Expenses() {
   };
 
   const exportPDF = async () => {
-    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
-      import("jspdf"),
-      import("jspdf-autotable"),
-    ]);
-    const doc = new jsPDF();
-    const pos = moneyPosition(mainCurrency);
-    const generatedAt = new Date().toLocaleString();
-    const userName = settings?.fullName || "";
-    const userEmail = settings?.email || "";
+    try {
+      setIsExportingPdf(true);
+      const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+        import("jspdf"),
+        import("jspdf-autotable"),
+      ]);
 
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(30, 58, 138);
-    doc.text("Money Tracker", 14, 16);
+      const doc = new jsPDF();
+      const pos = moneyPosition(mainCurrency);
+      const generatedAt = new Date().toLocaleString();
+      const userName = settings?.fullName || "";
+      const userEmail = settings?.email || "";
 
-    doc.setFontSize(11);
-    doc.setTextColor(0);
-    doc.text("Activity Report", 14, 23);
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 58, 138);
+      doc.text("Money Tracker", 14, 16);
 
-    doc.setDrawColor(200, 210, 235);
-    doc.setLineWidth(0.5);
-    doc.line(14, 27, 196, 27);
+      doc.setFontSize(11);
+      doc.setTextColor(0);
+      doc.text("Activity Report", 14, 23);
 
-    doc.setFontSize(8.5);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(80);
-    doc.text("Generated: " + generatedAt, 14, 33);
-    doc.text("User: " + (userName ? userName + "  |  " : "") + userEmail, 14, 39);
+      doc.setDrawColor(200, 210, 235);
+      doc.setLineWidth(0.5);
+      doc.line(14, 27, 196, 27);
 
-    const filterParts: string[] = ["Date: " + getActiveDateLabel()];
-    if (paidFromFilter) {
-      const acc = accounts.find((a) => String(a.id) === paidFromFilter);
-      if (acc) filterParts.push("Account: " + acc.name + " (" + acc.baseCurrency + ")");
-    }
-    if (categoryFilter) filterParts.push("Category: " + categoryFilter);
-    if (selectedTypes.length > 0) {
-      const labels = selectedTypes.map((k) => TYPE_OPTIONS.find((o) => o.key === k)?.label || k);
-      filterParts.push("Types: " + labels.join(", "));
-    }
-    doc.text("Filters: " + filterParts.join("   |   "), 14, 45);
+      doc.setFontSize(8.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(80);
+      doc.text("Generated: " + generatedAt, 14, 33);
+      doc.text("User: " + (userName ? userName + "  |  " : "") + userEmail, 14, 39);
 
-    doc.setTextColor(0);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text("Summary", 14, 56);
-
-    const cashflowSign = netCashflow >= 0 ? "+" : "-";
-    const cashflowFormatted = cashflowSign + formatMoney(Math.abs(netCashflow), mainCurrency as Currency, pos);
-
-    const summaryRows = [
-      ["Total Expenses", formatMoney(totals.expenses, mainCurrency as Currency, pos)],
-      ["Total Deposits", formatMoney(totals.deposits, mainCurrency as Currency, pos)],
-      ["Total Withdrawals", formatMoney(totals.withdrawals, mainCurrency as Currency, pos)],
-      ["Net Cashflow (deposits - expenses - withdrawals)", cashflowFormatted],
-      ["Transfers Out (between own accounts, not included in cashflow)", formatMoney(totals.transfersOut, mainCurrency as Currency, pos)],
-    ];
-
-    autoTable(doc, {
-      startY: 60,
-      head: [["Metric", "Amount (" + mainCurrency + ")"]],
-      body: summaryRows,
-      styles: { fontSize: 8, cellPadding: 3 },
-      headStyles: { fillColor: [30, 58, 138], fontStyle: "bold", halign: "left" },
-      columnStyles: {
-        0: { halign: "left", cellWidth: 130 },
-        1: { halign: "right", cellWidth: 50 },
-      },
-      margin: { left: 14, right: 14 },
-    });
-
-    const tableBody = filteredActivity.map((item) => {
-      if (item.itemType === "EXPENSE") {
-        const exp = item.data;
-        const acc = getAccountById(exp.accountId, exp.account);
-        return [
-          exp.description || "-",
-          formatExpenseAmount(exp),
-          exp.category === "Subscriptions" ? "Subscription" : "Expense",
-          acc ? acc.name + " (" + acc.baseCurrency + ")" : "-",
-          new Date(exp.date).toLocaleDateString(),
-        ];
+      const filterParts: string[] = ["Date: " + getActiveDateLabel()];
+      if (paidFromFilter) {
+        const acc = accounts.find((a) => String(a.id) === paidFromFilter);
+        if (acc) filterParts.push("Account: " + acc.name + " (" + acc.baseCurrency + ")");
       }
-      const action = item.data;
-      const isTransfer = action.type === "TRANSFER_OUT" || action.type === "TRANSFER_IN";
-      const accountDisplay = isTransfer
-        ? getAccountName(action.accountId, action.account) + " > " + getAccountName(action.toAccountId, action.toAccount)
-        : (() => {
-          const acc = getAccountById(action.accountId, action.account);
-          return acc ? acc.name + " (" + acc.baseCurrency + ")" : "-";
-        })();
-      const acc = getAccountById(action.accountId, action.account);
-      const currency = acc?.baseCurrency || "EUR";
-      return [
-        action.description || getActionLabel(action.type),
-        formatMoney(action.amount, currency as Currency, moneyPosition(currency as Currency)),
-        getActionLabel(action.type),
-        accountDisplay,
-        new Date(action.date).toLocaleDateString(),
+      if (categoryFilter) filterParts.push("Category: " + categoryFilter);
+      if (selectedTypes.length > 0) {
+        const labels = selectedTypes.map((k) => TYPE_OPTIONS.find((o) => o.key === k)?.label || k);
+        filterParts.push("Types: " + labels.join(", "));
+      }
+      doc.text("Filters: " + filterParts.join("   |   "), 14, 45);
+
+      doc.setTextColor(0);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("Summary", 14, 56);
+
+      const cashflowSign = netCashflow >= 0 ? "+" : "-";
+      const cashflowFormatted = cashflowSign + formatMoney(Math.abs(netCashflow), mainCurrency as Currency, pos);
+
+      const summaryRows = [
+        ["Total Expenses", formatMoney(totals.expenses, mainCurrency as Currency, pos)],
+        ["Total Deposits", formatMoney(totals.deposits, mainCurrency as Currency, pos)],
+        ["Total Withdrawals", formatMoney(totals.withdrawals, mainCurrency as Currency, pos)],
+        ["Net Cashflow (deposits - expenses - withdrawals)", cashflowFormatted],
+        ["Transfers Out (between own accounts, not included in cashflow)", formatMoney(totals.transfersOut, mainCurrency as Currency, pos)],
       ];
-    });
 
-    const finalY = (doc as any).lastAutoTable?.finalY ?? 110;
+      autoTable(doc, {
+        startY: 60,
+        head: [["Metric", "Amount (" + mainCurrency + ")"]],
+        body: summaryRows,
+        styles: { fontSize: 8, cellPadding: 3 },
+        headStyles: { fillColor: [30, 58, 138], fontStyle: "bold", halign: "left" },
+        columnStyles: {
+          0: { halign: "left", cellWidth: 130 },
+          1: { halign: "right", cellWidth: 50 },
+        },
+        margin: { left: 14, right: 14 },
+      });
 
-    autoTable(doc, {
-      startY: finalY + 10,
-      head: [["Description", "Amount", "Type", "Account", "Date"]],
-      body: tableBody,
-      styles: { fontSize: 8, cellPadding: 3 },
-      headStyles: { fillColor: [59, 130, 246], fontStyle: "bold" },
-      columnStyles: {
-        0: { halign: "left" },
-        1: { halign: "right", cellWidth: 28 },
-        2: { halign: "left", cellWidth: 28 },
-        3: { halign: "left" },
-        4: { halign: "right", cellWidth: 22 },
-      },
-      alternateRowStyles: { fillColor: [245, 247, 255] },
-      margin: { left: 14, right: 14 },
-    });
+      const tableBody = filteredActivity.map((item) => {
+        if (item.itemType === "EXPENSE") {
+          const exp = item.data;
+          const acc = getAccountById(exp.accountId, exp.account);
+          return [
+            exp.description || "-",
+            formatExpenseAmount(exp),
+            exp.category === "Subscriptions" ? "Subscription" : "Expense",
+            acc ? acc.name + " (" + acc.baseCurrency + ")" : "-",
+            new Date(exp.date).toLocaleDateString(),
+          ];
+        }
+        const action = item.data;
+        const isTransfer = action.type === "TRANSFER_OUT" || action.type === "TRANSFER_IN";
+        const accountDisplay = isTransfer
+          ? getAccountName(action.accountId, action.account) + " > " + getAccountName(action.toAccountId, action.toAccount)
+          : (() => {
+              const acc = getAccountById(action.accountId, action.account);
+              return acc ? acc.name + " (" + acc.baseCurrency + ")" : "-";
+            })();
+        const acc = getAccountById(action.accountId, action.account);
+        const currency = acc?.baseCurrency || "EUR";
+        return [
+          action.description || getActionLabel(action.type),
+          formatMoney(action.amount, currency as Currency, moneyPosition(currency as Currency)),
+          getActionLabel(action.type),
+          accountDisplay,
+          new Date(action.date).toLocaleDateString(),
+        ];
+      });
 
-    const pageCount = (doc as any).internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(7);
-      doc.setTextColor(160);
-      doc.text(
-        "Page " + i + " of " + pageCount + "   |   Money Tracker   |   " + generatedAt,
-        14,
-        doc.internal.pageSize.getHeight() - 8
-      );
+      const finalY = (doc as any).lastAutoTable?.finalY ?? 110;
+
+      autoTable(doc, {
+        startY: finalY + 10,
+        head: [["Description", "Amount", "Type", "Account", "Date"]],
+        body: tableBody,
+        styles: { fontSize: 8, cellPadding: 3 },
+        headStyles: { fillColor: [59, 130, 246], fontStyle: "bold" },
+        columnStyles: {
+          0: { halign: "left" },
+          1: { halign: "right", cellWidth: 28 },
+          2: { halign: "left", cellWidth: 28 },
+          3: { halign: "left" },
+          4: { halign: "right", cellWidth: 22 },
+        },
+        alternateRowStyles: { fillColor: [245, 247, 255] },
+        margin: { left: 14, right: 14 },
+      });
+
+      const pageCount = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(7);
+        doc.setTextColor(160);
+        doc.text(
+          "Page " + i + " of " + pageCount + "   |   Money Tracker   |   " + generatedAt,
+          14,
+          doc.internal.pageSize.getHeight() - 8
+        );
+      }
+
+      doc.save("activity-" + new Date().toISOString().slice(0, 10) + ".pdf");
+    } catch (err) {
+      console.error("Failed to generate PDF:", err);
+    } finally {
+      setIsExportingPdf(false);
     }
-
-    doc.save("activity-" + new Date().toISOString().slice(0, 10) + ".pdf");
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleCreateExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!amount || !date || !category) { setError("Please fill amount, date and category"); return; }
-    if (!selectedAccountId) { setError("Please select the account/resource"); return; }
+
+    if (!amount || !date || !category) {
+      setError("Please fill amount, date, and category.");
+      return;
+    }
+    if (!selectedAccountId) {
+      setError("Please select the paying account.");
+      return;
+    }
+
     try {
       setSubmitting(true);
-      await api.post("/expenses", { amount: Number(amount), date, category, description: description || undefined, accountId: selectedAccountId });
-      setAmount(""); setDate(""); setCategory("Food"); setDescription(""); setSelectedAccountId("");
+      await api.post("/expenses", {
+        amount: Number(amount),
+        date,
+        category,
+        description: description.trim() || undefined,
+        accountId: selectedAccountId,
+      });
+
+      setAmount("");
+      setDate("");
+      setCategory("Food");
+      setDescription("");
+      setSelectedAccountId("");
       await fetchData();
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to create expense");
@@ -512,40 +485,19 @@ export default function Expenses() {
     }
   };
 
-  const formatDateForInput = (value: string) => {
-    const d = new Date(value);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  };
-
-  const openEditModal = (expense: Expense) => {
-    setEditingExpense(expense);
-    setEditAmount(String(expense.amount));
-    setEditDate(formatDateForInput(expense.date));
-    setEditCategory(expense.category);
-    setEditDescription(expense.description || "");
-    setEditAccountId(expense.accountId ?? "");
-    setEditError("");
-  };
-
-  const closeEditModal = () => {
-    setEditingExpense(null);
-    setEditAmount(""); setEditDate(""); setEditCategory("Food"); setEditDescription(""); setEditAccountId("");
-    setEditError("");
-  };
-
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setEditError("");
+  const handleEditSave = async (payload: {
+    amount: number;
+    date: string;
+    category: string;
+    description?: string;
+    accountId: number;
+  }) => {
     if (!editingExpense) return;
-    if (!editAmount || !editDate || !editCategory) { setEditError("Please fill amount, date and category"); return; }
-    if (!editAccountId) { setEditError("Please select the account/resource"); return; }
     try {
       setEditSubmitting(true);
-      await api.put(`/expenses/${editingExpense.id}`, {
-        amount: Number(editAmount), date: editDate, category: editCategory,
-        description: editDescription || undefined, accountId: editAccountId,
-      });
-      closeEditModal();
+      setEditError("");
+      await api.put(`/expenses/${editingExpense.id}`, payload);
+      setEditingExpense(null);
       await fetchData();
     } catch (err: any) {
       setEditError(err.response?.data?.error || "Failed to update expense");
@@ -554,11 +506,20 @@ export default function Expenses() {
     }
   };
 
+  const accountOptions: AccountOption[] = useMemo(() => {
+    return accounts.map((a) => ({
+      id: a.id,
+      name: a.name,
+      baseCurrency: a.baseCurrency,
+    }));
+  }, [accounts]);
+
   return (
     <div className="space-y-6 sm:space-y-8">
+      {/* Page Header */}
       <div>
         <div className="flex items-center gap-3">
-          <div className="rounded-2xl bg-rose-100 p-2.5 text-rose-600 dark:bg-rose-950/50 dark:text-rose-300">
+          <div className="rounded-2xl bg-rose-500/10 p-2.5 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400">
             <Receipt className="h-6 w-6" />
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 sm:text-4xl">
@@ -566,541 +527,196 @@ export default function Expenses() {
           </h1>
         </div>
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 sm:text-base">
-          Track expenses, subscription charges, deposits, withdrawals, and transfers in one place.
+          Track expenses, subscription charges, deposits, withdrawals, and transfers in one unified ledger.
         </p>
       </div>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
+      {/* Add New Expense Section */}
+      <Card padding="md">
         <div className="mb-6 flex items-start gap-3">
-          <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+          <div className="rounded-2xl bg-emerald-500/10 p-2.5 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
             <Plus className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Add New Expense</h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Record daily spending and choose which account paid for it.</p>
+            <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+              Add New Expense
+            </h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Record daily spending and choose which account paid for it.
+            </p>
           </div>
         </div>
 
         {error && (
-          <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+          >
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+        <form onSubmit={handleCreateExpense} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+          <Input
+            ref={amountInputRef}
+            label="Amount"
+            type="number"
+            min="0"
+            step="0.01"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="25.00"
+            required
+          />
+
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Amount</label>
-            <input ref={amountInputRef} type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="25.00" className={inputClass} />
+            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Date
+            </label>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              required
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-[#070b14] dark:text-slate-100"
+            />
           </div>
-          <div className="min-w-0 overflow-hidden">
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Date</label>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`block min-w-0 max-w-full ${inputClass}`} />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Category</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputClass}>
-              <option value="Food">Food</option>
-              <option value="Transport">Transport</option>
-              <option value="Shopping">Shopping</option>
-              <option value="Bills">Bills</option>
-              <option value="Entertainment">Entertainment</option>
-              <option value="Subscriptions">Subscriptions</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-          <div className="xl:col-span-1">
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Description</label>
-            <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Groceries, Uber, etc." className={inputClass} />
-          </div>
-          <div className="xl:col-span-1">
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Paid From</label>
-            <select value={selectedAccountId} onChange={(e) => setSelectedAccountId(e.target.value ? Number(e.target.value) : "")} className={inputClass}>
-              <option value="">Select account</option>
-              {accounts.map((acc) => (
-                <option key={acc.id} value={acc.id}>{acc.name} ({acc.baseCurrency})</option>
-              ))}
-            </select>
-          </div>
+
+          <Select
+            label="Category"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            required
+          >
+            <option value="Food">Food</option>
+            <option value="Transport">Transport</option>
+            <option value="Shopping">Shopping</option>
+            <option value="Bills">Bills</option>
+            <option value="Entertainment">Entertainment</option>
+            <option value="Subscriptions">Subscriptions</option>
+            <option value="Other">Other</option>
+          </Select>
+
+          <Input
+            label="Description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Groceries, Uber, etc."
+          />
+
+          <Select
+            label="Paid From"
+            value={selectedAccountId}
+            onChange={(e) => setSelectedAccountId(e.target.value ? Number(e.target.value) : "")}
+            required
+          >
+            <option value="">Select account</option>
+            {accounts.map((acc) => (
+              <option key={acc.id} value={acc.id}>
+                {acc.name} ({acc.baseCurrency})
+              </option>
+            ))}
+          </Select>
+
           <div className="flex items-end">
-            <button type="submit" disabled={submitting} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300 dark:disabled:bg-blue-900/40">
-              <Plus className="h-4 w-4" />
-              {submitting ? "Adding..." : "Add expense"}
-            </button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              isLoading={submitting}
+              leftIcon={<Plus className="h-4 w-4" />}
+              className="w-full"
+            >
+              Add expense
+            </Button>
           </div>
         </form>
-      </section>
+      </Card>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
-        <div className="mb-6 flex items-start gap-3">
-          <div className="rounded-2xl bg-amber-100 p-2.5 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
-            <Receipt className="h-5 w-5" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Recent Activity</h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Review your latest financial activity across expenses and balance actions.</p>
-          </div>
+      {/* Filter Ledger Bar */}
+      <ExpenseFilters
+        categoryFilter={categoryFilter}
+        onCategoryFilterChange={setCategoryFilter}
+        categoryOptions={categoryOptions}
+        paidFromFilter={paidFromFilter}
+        onPaidFromFilterChange={setPaidFromFilter}
+        accounts={accountOptions}
+        datePreset={datePreset}
+        onDatePresetChange={setDatePreset}
+        dateFrom={dateFrom}
+        onDateFromChange={setDateFrom}
+        dateTo={dateTo}
+        onDateToChange={setDateTo}
+        selectedTypes={selectedTypes}
+        onToggleType={toggleType}
+        activeFilterCount={activeFilterCount}
+        hasActiveFilters={hasActiveFilters}
+        onClearFilters={clearFilters}
+        filteredCount={filteredActivity.length}
+        totalCount={activityItems.length}
+        onExportPdf={exportPDF}
+        isExportingPdf={isExportingPdf}
+        totals={totals}
+        netCashflow={netCashflow}
+        mainCurrency={mainCurrency}
+      />
+
+      {/* Ledger Content Area */}
+      {loading ? (
+        <div className="space-y-3">
+          <Skeleton className="h-14 w-full rounded-2xl" />
+          <Skeleton className="h-14 w-full rounded-2xl" />
+          <Skeleton className="h-14 w-full rounded-2xl" />
+          <Skeleton className="h-14 w-full rounded-2xl" />
         </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="rounded-xl bg-white p-1.5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
-                <Filter className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-              </div>
-              <div>
-                <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">Filters</span>
-                {activeFilterCount > 0 && (
-                  <span className="ml-2 rounded-full bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">
-                    {activeFilterCount} active
-                  </span>
-                )}
-              </div>
-            </div>
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-              >
-                Reset all
-              </button>
-            )}
-          </div>
-
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Category</label>
-              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className={filterInputClass}>
-                <option value="">All categories</option>
-                {categoryOptions.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Account</label>
-              <select value={paidFromFilter} onChange={(e) => setPaidFromFilter(e.target.value)} className={filterInputClass}>
-                <option value="">All accounts</option>
-                {accounts.map((acc) => (
-                  <option key={acc.id} value={String(acc.id)}>{acc.name} ({acc.baseCurrency})</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <SectionDivider label="Date range" />
-
-          <div className="flex flex-wrap gap-2">
-            {DATE_PRESETS.map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setDatePreset(key)}
-                className={`rounded-xl border px-3.5 py-1.5 text-sm font-medium transition-all ${datePreset === key
-                    ? "border-blue-600 bg-blue-600 text-white shadow-sm"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-blue-700 dark:hover:bg-blue-950/30 dark:hover:text-blue-300"
-                  }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {datePreset === "custom" && (
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <div className="min-w-0 overflow-hidden">
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">From</label>
-                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={`block min-w-0 max-w-full ${filterInputClass}`} />
-              </div>
-              <div className="min-w-0 overflow-hidden">
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">To</label>
-                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={`block min-w-0 max-w-full ${filterInputClass}`} />
-              </div>
-            </div>
-          )}
-
-          <SectionDivider label="Activity type" />
-
-          <div className="flex flex-wrap gap-2">
-            {TYPE_OPTIONS.map(({ key, label, active, dot }) => {
-              const isSelected = selectedTypes.includes(key);
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => toggleType(key)}
-                  className={`flex items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-sm font-medium transition-all ${isSelected
-                      ? active + " shadow-sm"
-                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-                    }`}
-                >
-                  {!isSelected && <span className={`h-2 w-2 rounded-full ${dot}`} />}
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-
-          {rates && (
-            <>
-              <SectionDivider label="Totals" />
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-                <div className="grid grid-cols-2 sm:grid-cols-4">
-                  <div className="border-b border-r border-slate-100 p-4 dark:border-slate-800">
-                    <div className="mb-2 flex items-center gap-1.5">
-                      <TrendingDown className="h-3.5 w-3.5 text-rose-500" />
-                      <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Expenses</span>
-                    </div>
-                    <p className="text-lg font-bold text-rose-600 dark:text-rose-400">
-                      {formatMoney(totals.expenses, mainCurrency, moneyPosition(mainCurrency))}
-                    </p>
-                  </div>
-
-                  <div className="border-b border-slate-100 p-4 dark:border-slate-800 sm:border-r">
-                    <div className="mb-2 flex items-center gap-1.5">
-                      <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-                      <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Deposits</span>
-                    </div>
-                    <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
-                      {formatMoney(totals.deposits, mainCurrency, moneyPosition(mainCurrency))}
-                    </p>
-                  </div>
-
-                  <div className="border-b border-r border-slate-100 p-4 dark:border-slate-800 sm:border-b-0">
-                    <div className="mb-2 flex items-center gap-1.5">
-                      <Wallet className="h-3.5 w-3.5 text-slate-400" />
-                      <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Net cashflow</span>
-                    </div>
-                    <p className={`text-lg font-bold ${netCashflow >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
-                      {netCashflow >= 0 ? "+" : "\u2212"}
-                      {formatMoney(Math.abs(netCashflow), mainCurrency, moneyPosition(mainCurrency))}
-                    </p>
-                    <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">excl. transfers</p>
-                  </div>
-
-                  <div className="p-4">
-                    <div className="mb-2 flex items-center gap-1.5">
-                      <ArrowLeftRight className="h-3.5 w-3.5 text-blue-500" />
-                      <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Transfers</span>
-                    </div>
-                    <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                      {formatMoney(totals.transfersOut, mainCurrency, moneyPosition(mainCurrency))}
-                    </p>
-                    <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">between own accounts</p>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Showing{" "}
-              <span className="font-semibold text-slate-900 dark:text-slate-100">{filteredActivity.length}</span>{" "}
-              of{" "}
-              <span className="font-semibold text-slate-900 dark:text-slate-100">{activityItems.length}</span>{" "}
-              activity items
-            </p>
-            <div className="flex items-center gap-2">
-              {hasActiveFilters && (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  Clear filters
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={exportPDF}
-                className="inline-flex items-center gap-1.5 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 shadow-sm shadow-blue-200 dark:shadow-none"
-              >
-                <Download className="h-3.5 w-3.5" />
-                Export PDF
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {loading ? (
-          <p className="mt-6 text-sm text-slate-400 dark:text-slate-500">Loading...</p>
-        ) : activityItems.length === 0 ? (
-          <div className="mt-6 rounded-3xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center dark:border-slate-800 dark:bg-slate-950/50 sm:p-12">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
-              <Receipt className="h-7 w-7" aria-hidden="true" />
-            </div>
-            <h3 className="mt-4 text-lg font-bold text-slate-900 dark:text-slate-100">
-              No activity recorded yet
-            </h3>
-            <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
-              Log your daily expenses, bills, or account transactions to see your financial timeline and outflow analytics.
-            </p>
-            <div className="mt-6">
-              <button
-                type="button"
-                onClick={() => {
-                  amountInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-                  amountInputRef.current?.focus();
-                }}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/40"
-              >
-                <Plus className="h-4 w-4" aria-hidden="true" />
-                Log your first expense
-              </button>
-            </div>
-          </div>
-        ) : filteredActivity.length === 0 ? (
-          <div className="mt-6 rounded-3xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center dark:border-slate-800 dark:bg-slate-950/50 sm:p-10">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-              <Filter className="h-6 w-6" aria-hidden="true" />
-            </div>
-            <h3 className="mt-4 text-base font-bold text-slate-900 dark:text-slate-100">
-              No activity matches your filters
-            </h3>
-            <p className="mx-auto mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">
-              Try adjusting your date range, categories, or transaction types to see more results.
-            </p>
-            <div className="mt-5">
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus:ring-slate-800"
-              >
-                <X className="h-4 w-4" aria-hidden="true" />
-                Clear all filters
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="mt-6 hidden overflow-x-auto lg:block">
-              <table className="min-w-full text-left">
-                <thead className="border-b border-slate-200 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
-                  <tr>
-                    <th className="py-3 pr-4 font-medium">Description</th>
-                    <th className="py-3 pr-4 font-medium">Amount</th>
-                    <th className="py-3 pr-4 font-medium">Type</th>
-                    <th className="py-3 pr-4 font-medium">Account</th>
-                    <th className="py-3 pr-4 font-medium">Date</th>
-                    <th className="py-3 text-right font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredActivity.map((item) => {
-                    const converted = getConvertedActivityAmount(item);
-
-                    if (item.itemType === "EXPENSE") {
-                      const exp = item.data;
-                      return (
-                        <tr key={`expense-${exp.id}`} className="border-b border-slate-100 last:border-b-0 dark:border-slate-800">
-                          <td className="py-4 pr-4 text-slate-900 dark:text-slate-100">{exp.description || "-"}</td>
-                          <td className="py-4 pr-4 font-semibold text-rose-600 dark:text-rose-400">
-                            <p>{formatExpenseAmount(exp)}</p>
-                            {converted && <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">{converted}</p>}
-                          </td>
-                          <td className="py-4 pr-4 text-slate-700 dark:text-slate-300">
-                            {exp.category === "Subscriptions" ? "Subscription payment" : "Expense"}
-                          </td>
-                          <td className="py-4 pr-4 text-slate-700 dark:text-slate-300">{getAccountName(exp.accountId, exp.account)}</td>
-                          <td className="py-4 pr-4 text-slate-700 dark:text-slate-300">{new Date(exp.date).toLocaleDateString()}</td>
-                          <td className="py-4 text-right">
-                            <button type="button" onClick={() => openEditModal(exp)} className="inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-600">
-                              <Pencil className="h-4 w-4" />
-                              Edit
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    }
-
-                    const action = item.data;
-                    const source = getAccountName(action.accountId, action.account);
-                    const target = getAccountName(action.toAccountId, action.toAccount);
-                    const amountColor =
-                      action.type === "DEPOSIT" ? "text-emerald-600 dark:text-emerald-400"
-                        : action.type === "WITHDRAWAL" ? "text-rose-600 dark:text-rose-400"
-                          : "text-blue-600 dark:text-blue-400";
-
-                    return (
-                      <tr key={`action-${action.id}`} className="border-b border-slate-100 last:border-b-0 dark:border-slate-800">
-                        <td className="py-4 pr-4 text-slate-900 dark:text-slate-100">{action.description || getActionLabel(action.type)}</td>
-                        <td className={`py-4 pr-4 font-semibold ${amountColor}`}>
-                          <p>{getActivityAmount(item)}</p>
-                          {converted && <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">{converted}</p>}
-                        </td>
-                        <td className="py-4 pr-4 text-slate-700 dark:text-slate-300">{getActionLabel(action.type)}</td>
-                        <td className="py-4 pr-4 text-slate-700 dark:text-slate-300">
-                          {action.type === "TRANSFER_OUT" || action.type === "TRANSFER_IN" ? `${source} \u2192 ${target}` : source}
-                        </td>
-                        <td className="py-4 pr-4 text-slate-700 dark:text-slate-300">{new Date(action.date).toLocaleDateString()}</td>
-                        <td className="py-4 text-right">
-                          <span className="text-sm text-slate-400 dark:text-slate-500">—</span>
-                        </td>                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="mt-6 grid grid-cols-1 gap-4 lg:hidden">
-              {filteredActivity.map((item) => {
-                const converted = getConvertedActivityAmount(item);
-
-                if (item.itemType === "EXPENSE") {
-                  const exp = item.data;
-                  return (
-                    <div key={`expense-${exp.id}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <p className="text-base font-semibold text-slate-900 dark:text-slate-100">{exp.description || "No description"}</p>
-                          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{exp.category === "Subscriptions" ? "Subscription payment" : exp.category}</p>
-                        </div>
-                        <div>
-                          <p className="text-lg font-bold text-rose-600 dark:text-rose-400">{formatExpenseAmount(exp)}</p>
-                          {converted && <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">{converted}</p>}
-                        </div>
-                      </div>
-                      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <p className="text-slate-500 dark:text-slate-400">Account</p>
-                          <p className="font-semibold text-slate-900 dark:text-slate-100">{getAccountName(exp.accountId, exp.account)}</p>
-                        </div>
-                        <div>
-                          <p className="text-slate-500 dark:text-slate-400">Date</p>
-                          <p className="font-semibold text-slate-900 dark:text-slate-100">{new Date(exp.date).toLocaleDateString()}</p>
-                        </div>
-                      </div>
-                      <button type="button" onClick={() => openEditModal(exp)} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-600">
-                        <Pencil className="h-4 w-4" />
-                        Edit
-                      </button>
-                    </div>
-                  );
-                }
-
-                const action = item.data;
-                const amountColor =
-                  action.type === "DEPOSIT" ? "text-emerald-600 dark:text-emerald-400"
-                    : action.type === "WITHDRAWAL" ? "text-rose-600 dark:text-rose-400"
-                      : "text-blue-600 dark:text-blue-400";
-
-                return (
-                  <div key={`action-${action.id}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="flex items-start gap-3">
-                        <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
-                          <ArrowLeftRight className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <p className="text-base font-semibold text-slate-900 dark:text-slate-100">{action.description || getActionLabel(action.type)}</p>
-                          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{getActionLabel(action.type)}</p>
-                        </div>
-                      </div>
-                      <div>
-                        <p className={`text-lg font-bold ${amountColor}`}>{getActivityAmount(item)}</p>
-                        {converted && <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">{converted}</p>}
-                      </div>
-                    </div>
-                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <p className="text-slate-500 dark:text-slate-400">Account</p>
-                        <p className="font-semibold text-slate-900 dark:text-slate-100">
-                          {action.type === "TRANSFER_OUT" || action.type === "TRANSFER_IN"
-                            ? `${getAccountName(action.accountId, action.account)} \u2192 ${getAccountName(action.toAccountId, action.toAccount)}`
-                            : getAccountName(action.accountId, action.account)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500 dark:text-slate-400">Date</p>
-                        <p className="font-semibold text-slate-900 dark:text-slate-100">{new Date(action.date).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-      </section>
-
-      {editingExpense && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900 sm:p-8">
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <div className="rounded-2xl bg-amber-100 p-2.5 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
-                  <Pencil className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 sm:text-2xl">Edit Expense</h2>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Update the expense and keep balances synced.</p>
-                </div>
-              </div>
-              <button type="button" onClick={closeEditModal} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
-                <X className="h-4 w-4" />
-                Close
-              </button>
-            </div>
-
-            {editError && (
-              <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
-                {editError}
-              </div>
-            )}
-
-            <form onSubmit={handleEditSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Amount</label>
-                <input type="number" min="0" step="0.01" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} className={inputClass} />
-              </div>
-              <div className="min-w-0 overflow-hidden">
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Date</label>
-                <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className={`block min-w-0 max-w-full ${inputClass}`} />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Category</label>
-                <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className={inputClass}>
-                  <option value="Food">Food</option>
-                  <option value="Transport">Transport</option>
-                  <option value="Shopping">Shopping</option>
-                  <option value="Bills">Bills</option>
-                  <option value="Entertainment">Entertainment</option>
-                  <option value="Subscriptions">Subscriptions</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Description</label>
-                <input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className={inputClass} />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Paid From</label>
-                <div className="relative">
-                  <Wallet className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-                  <select value={editAccountId} onChange={(e) => setEditAccountId(e.target.value ? Number(e.target.value) : "")} className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40">
-                    <option value="">Select account</option>
-                    {accounts.map((acc) => (
-                      <option key={acc.id} value={acc.id}>{acc.name} ({acc.baseCurrency})</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="flex items-end gap-3 md:col-span-2 xl:col-span-1">
-                <button type="button" onClick={closeEditModal} className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
-                  <X className="h-4 w-4" />
-                  Cancel
-                </button>
-                <button type="submit" disabled={editSubmitting} className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300 dark:disabled:bg-blue-900/40">
-                  <Save className="h-4 w-4" />
-                  {editSubmitting ? "Saving..." : "Save changes"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      ) : activityItems.length === 0 ? (
+        <EmptyState
+          icon={Receipt}
+          title="No activity recorded yet"
+          description="Log your daily expenses, bills, or account transactions to see your financial timeline and outflow analytics."
+          actionText="Log your first expense"
+          actionIcon={<Plus className="h-4 w-4" />}
+          onAction={() => {
+            amountInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+            amountInputRef.current?.focus();
+          }}
+          iconBg="bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400"
+        />
+      ) : filteredActivity.length === 0 ? (
+        <EmptyState
+          icon={Receipt}
+          title="No activity matches your filters"
+          description="Try adjusting your date range, categories, or transaction types to see more results."
+          actionText="Clear all filters"
+          onAction={clearFilters}
+          iconBg="bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+        />
+      ) : (
+        <ActivityLedgerTable
+          items={filteredActivity}
+          onEditExpense={setEditingExpense}
+          formatExpenseAmount={formatExpenseAmount}
+          getActivityAmount={getActivityAmount}
+          getConvertedActivityAmount={getConvertedActivityAmount}
+          getAccountName={getAccountName}
+          getActionLabel={getActionLabel}
+        />
       )}
+
+      {/* Edit Expense Modal Dialog */}
+      <EditExpenseDialog
+        isOpen={Boolean(editingExpense)}
+        onClose={() => {
+          setEditingExpense(null);
+          setEditError("");
+        }}
+        expense={editingExpense}
+        accounts={accountOptions}
+        onSave={handleEditSave}
+        isSaving={editSubmitting}
+        error={editError}
+      />
     </div>
   );
 }

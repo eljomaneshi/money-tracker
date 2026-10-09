@@ -1,37 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { RefreshCcw, Repeat, Plus, XCircle } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, RefreshCcw, Repeat } from "lucide-react";
 import api from "../lib/api";
-import { formatMoney } from "../utils/formatMoney";
+import { type Currency, type ExchangeRates } from "../utils/formatMoney";
+import {
+  RenewalTimeline,
+  type SubscriptionItem,
+  type AccountItem,
+} from "../components/subscriptions/RenewalTimeline";
+import { SubscriptionCard } from "../components/subscriptions/SubscriptionCard";
+import { Button, Card, EmptyState, Input, Select, Skeleton } from "../components/ui";
 
-type Currency = "ALL" | "EUR" | "GBP" | "USD";
 type BillingPeriod = "MONTHLY" | "YEARLY";
-type SubscriptionStatus = "ACTIVE" | "CANCELLED";
-type AccountType = "BANK" | "CASH" | "CRYPTO" | "OTHER";
-
-type Subscription = {
-  id: number;
-  name: string;
-  price: number;
-  billingPeriod: BillingPeriod;
-  nextBillingDate: string;
-  status: SubscriptionStatus;
-  accountId?: number | null;
-};
-
-type Account = {
-  id: number;
-  name: string;
-  type: AccountType;
-  balance: number;
-  baseCurrency: Currency;
-};
-
-type ExchangeRates = {
-  ALL: number;
-  EUR: number;
-  GBP: number;
-  USD: number;
-};
 
 type UserSettings = {
   email: string;
@@ -44,43 +23,22 @@ type UserSettings = {
   notifySubscriptionCancelled: boolean;
 };
 
-const convertAmount = (
-  amount: number,
-  from: Currency,
-  to: Currency,
-  rates: ExchangeRates
-) => {
-  if (from === to) return amount;
-
-  const fromRate = from === "EUR" ? 1 : rates[from];
-  const toRate = to === "EUR" ? 1 : rates[to];
-
-  if (
-    !Number.isFinite(amount) ||
-    !Number.isFinite(fromRate) ||
-    !Number.isFinite(toRate) ||
-    fromRate <= 0 ||
-    toRate <= 0
-  ) {
-    return 0;
-  }
-
-  const amountInEur = from === "EUR" ? amount : amount / fromRate;
-  return to === "EUR" ? amountInEur : amountInEur * toRate;
-};
-
 export default function Subscriptions() {
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([]);
+  const [accounts, setAccounts] = useState<AccountItem[]>([]);
   const [rates, setRates] = useState<ExchangeRates | null>(null);
   const [settings, setSettings] = useState<UserSettings | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
+
+  const [activeTab, setActiveTab] = useState<"ACTIVE" | "CANCELLED">("ACTIVE");
 
   const subscriptionNameInputRef = useRef<HTMLInputElement>(null);
 
+  // New subscription form state
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("MONTHLY");
@@ -121,40 +79,8 @@ export default function Subscriptions() {
     settings?.secondCurrency && settings.secondCurrency !== mainCurrency
       ? settings.secondCurrency
       : mainCurrency === "ALL"
-        ? "EUR"
-        : "ALL";
-
-  const getAccountById = (id?: number | null) =>
-    accounts.find((acc) => acc.id === id);
-
-  const getAccountName = (id?: number | null) => {
-    if (!id) return "No account";
-    return getAccountById(id)?.name || "Unknown account";
-  };
-
-  const formatSubscriptionPrice = (sub: Subscription) => {
-    const accountCurrency = getAccountById(sub.accountId)?.baseCurrency || "EUR";
-    return formatMoney(
-      sub.price,
-      accountCurrency,
-      accountCurrency === "ALL" ? "after" : "before"
-    );
-  };
-
-  const getConvertedPrice = (sub: Subscription) => {
-    if (!rates) return null;
-
-    const accountCurrency = getAccountById(sub.accountId)?.baseCurrency || "EUR";
-    if (accountCurrency === secondCurrency) return null;
-
-    const converted = convertAmount(sub.price, accountCurrency, secondCurrency, rates);
-
-    return formatMoney(
-      converted,
-      secondCurrency,
-      secondCurrency === "ALL" ? "after" : "before"
-    );
-  };
+      ? "EUR"
+      : "ALL";
 
   const activeSubscriptions = useMemo(
     () => subscriptions.filter((sub) => sub.status === "ACTIVE"),
@@ -203,219 +129,69 @@ export default function Subscriptions() {
 
   const handleCancelSubscription = async (id: number) => {
     try {
+      setCancellingId(id);
       await api.patch(`/subscriptions/${id}/cancel`);
       await fetchData();
     } catch (err: any) {
       console.error(err);
       setError(err.response?.data?.error || "Failed to cancel subscription");
+    } finally {
+      setCancellingId(null);
     }
   };
 
-  const renderRows = (
-    items: Subscription[],
-    emptyText: string,
-    showCancel: boolean
-  ) => {
-    if (loading) {
-      return (
-        <div className="px-6 py-8 text-sm text-slate-400 dark:text-slate-500">
-          Loading...
-        </div>
-      );
-    }
-
-    if (items.length === 0) {
-      if (showCancel && subscriptions.length === 0) {
-        return (
-          <div className="p-8 text-center sm:p-12">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
-              <Repeat className="h-7 w-7" aria-hidden="true" />
-            </div>
-            <h3 className="mt-4 text-lg font-bold text-slate-900 dark:text-slate-100">
-              No subscriptions tracked yet
-            </h3>
-            <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
-              Track your recurring monthly and yearly services to forecast renewals.
-            </p>
-            <div className="mt-6">
-              <button
-                type="button"
-                onClick={() => {
-                  subscriptionNameInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-                  subscriptionNameInputRef.current?.focus();
-                }}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/40"
-              >
-                <Plus className="h-4 w-4" aria-hidden="true" />
-                Add a subscription
-              </button>
-            </div>
-          </div>
-        );
-      }
-
-      return (
-        <div className="px-6 py-8 text-sm text-slate-500 dark:text-slate-400">
-          {emptyText}
-        </div>
-      );
-    }
-
-    return (
-      <>
-        <div className="hidden grid-cols-6 gap-4 border-b border-slate-200 px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400 lg:grid">
-          <div>Description</div>
-          <div>Amount</div>
-          <div>Type</div>
-          <div>Account</div>
-          <div>Date</div>
-          <div className="text-right">Actions</div>
-        </div>
-
-        <div className="divide-y divide-slate-200 dark:divide-slate-800">
-          {items.map((sub) => {
-            const converted = showSecondCurrency ? getConvertedPrice(sub) : null;
-
-            return (
-              <div key={sub.id}>
-                <div className="hidden grid-cols-6 gap-4 px-6 py-5 lg:grid lg:items-center">
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-slate-900 dark:text-slate-100">
-                      {sub.name}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">
-                      {formatSubscriptionPrice(sub)}
-                    </p>
-                    {converted && (
-                      <p className="mt-1 text-sm text-blue-700 dark:text-blue-400">
-                        {converted}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="text-slate-900 dark:text-slate-100">
-                    {sub.billingPeriod === "MONTHLY" ? "Monthly" : "Yearly"}
-                  </div>
-
-                  <div className="text-slate-900 dark:text-slate-100">
-                    {getAccountName(sub.accountId)}
-                  </div>
-
-                  <div className="text-slate-900 dark:text-slate-100">
-                    {new Date(sub.nextBillingDate).toLocaleDateString()}
-                  </div>
-
-                  <div className="flex justify-end">
-                    {showCancel ? (
-                      <button
-                        type="button"
-                        onClick={() => handleCancelSubscription(sub.id)}
-                        className="inline-flex items-center gap-2 rounded-2xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700"
-                      >
-                        <XCircle className="h-4 w-4" />
-                        Cancel
-                      </button>
-                    ) : (
-                      <span className="text-sm text-slate-400 dark:text-slate-500">—</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-4 px-5 py-5 lg:hidden">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-slate-900 dark:text-slate-100">
-                        {sub.name}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                        {sub.billingPeriod === "MONTHLY" ? "Monthly" : "Yearly"}
-                      </p>
-                    </div>
-
-                    <div className="text-right">
-                      <p className="font-semibold text-slate-900 dark:text-slate-100">
-                        {formatSubscriptionPrice(sub)}
-                      </p>
-                      {converted && (
-                        <p className="mt-1 text-sm text-blue-700 dark:text-blue-400">
-                          {converted}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-slate-500 dark:text-slate-400">Account</p>
-                      <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">
-                        {getAccountName(sub.accountId)}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-slate-500 dark:text-slate-400">Date</p>
-                      <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">
-                        {new Date(sub.nextBillingDate).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-
-                  {showCancel && (
-                    <button
-                      type="button"
-                      onClick={() => handleCancelSubscription(sub.id)}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
-                    >
-                      <XCircle className="h-4 w-4" />
-                      Cancel subscription
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </>
-    );
-  };
+  const currentTabItems = activeTab === "ACTIVE" ? activeSubscriptions : cancelledSubscriptions;
 
   return (
     <div className="space-y-6 sm:space-y-8">
+      {/* Page Header */}
       <div>
         <div className="flex items-center gap-3">
-          <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+          <div className="rounded-2xl bg-violet-500/10 p-2.5 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400">
             <Repeat className="h-6 w-6" />
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 sm:text-4xl">
             Subscriptions
           </h1>
         </div>
-
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 sm:text-base">
-          Track recurring payments and the account they are paid from.
+          Track recurring services, upcoming renewal dates, and committed cash commitments.
         </p>
       </div>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
+      {/* Renewal Timeline & Outflow Telemetry */}
+      <RenewalTimeline
+        subscriptions={subscriptions}
+        accounts={accounts}
+        rates={rates}
+        mainCurrency={mainCurrency}
+        secondCurrency={secondCurrency}
+        showSecondCurrency={showSecondCurrency}
+        loading={loading}
+      />
+
+      {/* Add New Subscription Section */}
+      <Card padding="md">
         <div className="mb-6 flex items-start gap-3">
-          <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+          <div className="rounded-2xl bg-emerald-500/10 p-2.5 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
             <Plus className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+            <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
               Add New Subscription
             </h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Add recurring services like Netflix, Spotify, or utilities.
+              Track recurring services like Netflix, Spotify, or cloud hosting.
             </p>
           </div>
         </div>
 
         {error && (
-          <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+          >
             {error}
           </div>
         )}
@@ -424,129 +200,215 @@ export default function Subscriptions() {
           onSubmit={handleCreateSubscription}
           className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6"
         >
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Description
-            </label>
-            <input
-              ref={subscriptionNameInputRef}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Netflix"
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-            />
-          </div>
+          <Input
+            ref={subscriptionNameInputRef}
+            label="Service Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Netflix, Spotify..."
+            required
+          />
+
+          <Input
+            label="Price"
+            type="number"
+            step="0.01"
+            min="0"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="9.99"
+            required
+          />
+
+          <Select
+            label="Billing Cadence"
+            value={billingPeriod}
+            onChange={(e) => setBillingPeriod(e.target.value as BillingPeriod)}
+          >
+            <option value="MONTHLY">Monthly</option>
+            <option value="YEARLY">Yearly</option>
+          </Select>
+
+          <Select
+            label="Paying Account"
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : "")}
+          >
+            <option value="">No linked account</option>
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.name} ({account.baseCurrency})
+              </option>
+            ))}
+          </Select>
 
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Amount
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="9.99"
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Type
-            </label>
-            <select
-              value={billingPeriod}
-              onChange={(e) => setBillingPeriod(e.target.value as BillingPeriod)}
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-            >
-              <option value="MONTHLY">Monthly</option>
-              <option value="YEARLY">Yearly</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Account
-            </label>
-            <select
-              value={accountId}
-              onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : "")}
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
-            >
-              <option value="">Select account</option>
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="min-w-0 overflow-hidden">
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Date
+              Next Renewal
             </label>
             <input
               type="date"
               value={nextBillingDate}
               onChange={(e) => setNextBillingDate(e.target.value)}
-              className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+              required
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-[#070b14] dark:text-slate-100"
             />
           </div>
 
           <div className="flex items-end">
-            <button
+            <Button
               type="submit"
-              disabled={submitting}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300 dark:disabled:bg-blue-900/40"
+              variant="primary"
+              size="md"
+              isLoading={submitting}
+              leftIcon={<Plus className="h-4 w-4" />}
+              className="w-full"
             >
-              <Plus className="h-4 w-4" />
-              {submitting ? "Adding..." : "Add subscription"}
-            </button>
+              Add subscription
+            </Button>
           </div>
         </form>
-      </section>
+      </Card>
 
-      <section className="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="border-b border-slate-200 px-6 py-5 dark:border-slate-800 sm:px-8">
-          <div className="flex items-start gap-3">
-            <div className="rounded-2xl bg-blue-100 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
-              <RefreshCcw className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                Active Subscriptions
-              </h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Ongoing recurring payments linked to your accounts.
-              </p>
-            </div>
+      {/* Subscriptions List Section with Tabs */}
+      <div className="space-y-4">
+        {/* Segmented Tab Navigation */}
+        <div className="flex items-center justify-between">
+          <div className="inline-flex rounded-2xl border border-slate-200/80 bg-slate-100/80 p-1 dark:border-white/10 dark:bg-[#070b14]/80">
+            <button
+              type="button"
+              onClick={() => setActiveTab("ACTIVE")}
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all select-none cursor-pointer ${
+                activeTab === "ACTIVE"
+                  ? "bg-white text-slate-900 shadow-sm dark:bg-[#131e35] dark:text-white"
+                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+              }`}
+            >
+              <span>Active</span>
+              <span
+                className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono tabular-nums ${
+                  activeTab === "ACTIVE"
+                    ? "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400"
+                    : "bg-slate-200 text-slate-600 dark:bg-white/10 dark:text-slate-300"
+                }`}
+              >
+                {activeSubscriptions.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("CANCELLED")}
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all select-none cursor-pointer ${
+                activeTab === "CANCELLED"
+                  ? "bg-white text-slate-900 shadow-sm dark:bg-[#131e35] dark:text-white"
+                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+              }`}
+            >
+              <span>Cancelled</span>
+              <span
+                className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono tabular-nums ${
+                  activeTab === "CANCELLED"
+                    ? "bg-slate-300 text-slate-800 dark:bg-white/20 dark:text-slate-200"
+                    : "bg-slate-200 text-slate-600 dark:bg-white/10 dark:text-slate-300"
+                }`}
+              >
+                {cancelledSubscriptions.length}
+              </span>
+            </button>
           </div>
+
+          <p className="hidden text-xs text-slate-500 dark:text-slate-400 sm:block">
+            {activeTab === "ACTIVE" ? "Ongoing recurring subscriptions" : "Previously cancelled subscriptions"}
+          </p>
         </div>
 
-        {renderRows(activeSubscriptions, "No active subscriptions.", true)}
-      </section>
-
-      <section className="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="border-b border-slate-200 px-6 py-5 dark:border-slate-800 sm:px-8">
-          <div className="flex items-start gap-3">
-            <div className="rounded-2xl bg-slate-200 p-2.5 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+        {/* Content Render */}
+        {loading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-16 w-full rounded-2xl" />
+            <Skeleton className="h-16 w-full rounded-2xl" />
+            <Skeleton className="h-16 w-full rounded-2xl" />
+          </div>
+        ) : subscriptions.length === 0 ? (
+          <EmptyState
+            icon={Repeat}
+            title="No subscriptions tracked yet"
+            description="Track your recurring monthly and yearly services to forecast renewals."
+            actionText="Add a subscription"
+            actionIcon={<Plus className="h-4 w-4" />}
+            onAction={() => {
+              subscriptionNameInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+              subscriptionNameInputRef.current?.focus();
+            }}
+            iconBg="bg-violet-500/10 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400"
+          />
+        ) : currentTabItems.length === 0 ? (
+          <Card padding="md" className="py-12 text-center">
+            <div className="mx-auto mb-3 inline-flex rounded-2xl bg-slate-100 p-3 text-slate-500 dark:bg-white/5 dark:text-slate-400">
               <RefreshCcw className="h-5 w-5" />
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                Cancelled Subscriptions
-              </h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Previously cancelled subscriptions kept for reference.
-              </p>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+              {activeTab === "ACTIVE" ? "No active subscriptions" : "No cancelled subscriptions"}
+            </h3>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {activeTab === "ACTIVE"
+                ? "You have no ongoing subscriptions. Add one above to begin tracking renewals."
+                : "Cancelled subscriptions will appear here for historical reference."}
+            </p>
+          </Card>
+        ) : (
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden lg:block">
+              <Card padding="none" className="overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200/90 bg-slate-50/70 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-white/10 dark:bg-white/[0.02] dark:text-slate-400">
+                      <th className="py-3.5 pl-6 pr-4">Service</th>
+                      <th className="py-3.5 pr-4 text-right">Price</th>
+                      <th className="py-3.5 px-4 text-center">Status</th>
+                      <th className="py-3.5 px-4">Paying Account</th>
+                      <th className="py-3.5 px-4">Next Renewal</th>
+                      <th className="py-3.5 pl-4 pr-6 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                    {currentTabItems.map((sub) => (
+                      <SubscriptionCard
+                        key={`sub-${sub.id}`}
+                        subscription={sub}
+                        accounts={accounts}
+                        rates={rates}
+                        secondCurrency={secondCurrency}
+                        showSecondCurrency={showSecondCurrency}
+                        onCancel={handleCancelSubscription}
+                        isCancelling={cancellingId === sub.id}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
             </div>
-          </div>
-        </div>
 
-        {renderRows(cancelledSubscriptions, "No cancelled subscriptions.", false)}
-      </section>
+            {/* Mobile Card View */}
+            <div className="grid grid-cols-1 gap-3.5 lg:hidden">
+              {currentTabItems.map((sub) => (
+                <SubscriptionCard
+                  key={`sub-mobile-${sub.id}`}
+                  subscription={sub}
+                  accounts={accounts}
+                  rates={rates}
+                  secondCurrency={secondCurrency}
+                  showSecondCurrency={showSecondCurrency}
+                  onCancel={handleCancelSubscription}
+                  isCancelling={cancellingId === sub.id}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
