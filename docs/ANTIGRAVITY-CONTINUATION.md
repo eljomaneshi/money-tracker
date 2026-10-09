@@ -1,9 +1,9 @@
-# Current Continuation State — 2026-10-09
+# Current Continuation State — 2026-10-10
 
 ## 1. Repository & Git State
 - **Repository:** `eljomaneshi/money-tracker`
 - **Branch:** `main`
-- **Latest pushed commit:** `7a544a4 feat(ui): v2 Phase 6 — public trust pages and final polish`
+- **Latest pushed commit:** `837daf5 fix(ui): improve mobile activity controls and pagination`
 - **Local branch state:** Synchronized with `origin/main`.
 - **Working tree:** Clean (except unstaged `docs/ANTIGRAVITY-CONTINUATION.md`).
 - **Rule:** Do not deploy without explicit later approval.
@@ -11,6 +11,39 @@
 ---
 
 ## 2. Completed Work
+
+### Commit 837daf5 — Mobile UI Controls & Activity Pagination Bug Fixes (2026-10-10)
+Tightly scoped mobile usability and activity pagination bug fixes were implemented across five audited frontend files, verified with clean build and lint checks, committed, and pushed to `main`.
+- **Files changed in commit `837daf5`:**
+  - `frontend/src/pages/Expenses.tsx` (modified)
+  - `frontend/src/components/activity/ExpenseFilters.tsx` (modified)
+  - `frontend/src/components/ui/Select.tsx` (modified)
+  - `frontend/src/index.css` (modified)
+  - `frontend/src/components/QuickAction.tsx` (modified)
+- **Delivered behavior:**
+  - **Activity Ledger Pagination (`Expenses.tsx`, `ExpenseFilters.tsx`):**
+    - Client-side pagination (25 items per page) to prevent excessive scrolling and DOM bloat on long transaction histories.
+    - Responsive Previous/Next pagination controls, direct page navigation, and "Showing X–Y of Z activity items" range indicator (with "Showing 0 of 0" on empty sets).
+    - Render-time filter reset to page 1 via `filterKey` and render-time clamping (`currentPage > totalPages -> setCurrentPage(totalPages)`).
+    - Cashflow summary metrics and complete PDF export retain the entire filtered result set, preserving exact financial reporting.
+  - **Bounded Custom Select Component (`Select.tsx`):**
+    - Replaced unconstrained mobile native `<select>` popout with a viewport-bounded, accessible custom listbox (`w-full`, `max-h-60`, internal scroll, automatic upward opening when near viewport bottom).
+    - Synchronized hidden native `<select>` with standard form attributes (`name`, `required`, `disabled`) and dispatches a single bubbling native `change` event to invoke React's delegated `onChange` handler exactly once.
+    - Accessible combobox pattern: `role="combobox"`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, dynamic focus handling, and caller-provided `aria-label`/`aria-labelledby` forwarding.
+    - Keyboard navigation (`ArrowUp`/`ArrowDown`/`Home`/`End`/`Enter`/`Space`/`Escape`/`Tab`), outside-click dismissal, and ref forwarding (`useImperativeHandle`).
+  - **Native Date Input Styling (`index.css`):**
+    - Replaced conflicting appearance declarations with standard `color-scheme: light;` and `.dark input[type="date"] { color-scheme: dark; }`.
+    - Styled calendar picker indicator icon with pointer cursor and hover opacity while keeping inputs full-width in normal document flow.
+  - **QuickAction Modal Portal & Focus Management (`QuickAction.tsx`):**
+    - Wrapped modal overlay in `createPortal(modalContent, document.body)` with SSR guard to escape `<aside>` stacking context clipping.
+    - Non-destructive scroll lock capturing prior `document.body.style.overflow` and restoring it on cleanup.
+    - Added trigger ref returning focus to the trigger button upon dismissal (Escape, backdrop click, Close button), while omitting focus return on route navigation clicks.
+- **Verification performed:**
+  - `npm run build` (`tsc -b && vite build`) passed with exit code 0.
+  - ESLint verified clean on all modified files with 0 errors.
+  - `git diff --check` passed with 0 errors or whitespace issues.
+- **Validation limitation:**
+  - Physical mobile device and browser testing was not performed; all verification was completed via static analysis, automated build compilation, and linting. Mobile device/browser testing remains an unverified follow-up item.
 
 ### Commit 7a544a4 — Task v2 Phase 6: Public Trust Pages & Final Polish
 Phase 6 was verified with a clean build, reviewed locally, committed, and pushed to `main`.
@@ -475,6 +508,7 @@ The local development environment has been tested and verified operational:
 15. Task v2 Phase 4: Activity and subscriptions views overhaul (`2cb4df7`).
 16. Task v2 Phase 5: Notes and settings views overhaul (`46fbc2d`).
 17. Task v2 Phase 6: Public trust pages and final polish (`7a544a4`).
+18. Mobile UI controls and Activity pagination bug fixes (`837daf5`).
 
 ### Active Redesign Roadmap (Task v2 — Privacy-First FinTech UI):
 - **Phase 1 (Completed — `c216aac`):** Design tokens (`index.css`), atomic UI primitives (`src/components/ui/*`), route code-splitting (`App.tsx`), and dynamic import PDF isolation.
