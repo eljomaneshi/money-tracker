@@ -174,7 +174,7 @@ export function AccountActionDialog({
                 <option value="">Select source account</option>
                 {accounts.map((acc) => (
                   <option key={acc.id} value={acc.id}>
-                    {acc.name} ({acc.baseCurrency})
+                    {`${acc.name} (${acc.baseCurrency})`}
                   </option>
                 ))}
               </Select>
@@ -188,7 +188,7 @@ export function AccountActionDialog({
                 <option value="">Select destination account</option>
                 {accounts.map((acc) => (
                   <option key={acc.id} value={acc.id}>
-                    {acc.name} ({acc.baseCurrency})
+                    {`${acc.name} (${acc.baseCurrency})`}
                   </option>
                 ))}
               </Select>
@@ -203,7 +203,7 @@ export function AccountActionDialog({
               <option value="">Select account</option>
               {accounts.map((acc) => (
                 <option key={acc.id} value={acc.id}>
-                  {acc.name} ({acc.baseCurrency})
+                  {`${acc.name} (${acc.baseCurrency})`}
                 </option>
               ))}
             </Select>

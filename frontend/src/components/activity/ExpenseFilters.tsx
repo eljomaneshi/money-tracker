@@ -154,7 +154,7 @@ export function ExpenseFilters({
           <option value="">All accounts</option>
           {accounts.map((acc) => (
             <option key={acc.id} value={String(acc.id)}>
-              {acc.name} ({acc.baseCurrency})
+              {`${acc.name} (${acc.baseCurrency})`}
             </option>
           ))}
         </Select>

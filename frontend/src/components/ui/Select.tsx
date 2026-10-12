@@ -28,6 +28,37 @@ interface ParsedOption {
   disabled?: boolean;
 }
 
+function extractNodeText(node: React.ReactNode): string {
+  if (node === null || node === undefined || typeof node === "boolean") {
+    return "";
+  }
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
+  }
+  if (Array.isArray(node)) {
+    return node.map(extractNodeText).join("");
+  }
+  if (React.isValidElement(node)) {
+    const props = node.props as { children?: React.ReactNode };
+    return extractNodeText(props.children);
+  }
+  return "";
+}
+
+function getOptionLabel(
+  children: React.ReactNode,
+  fallbackValue?: string | number | readonly string[],
+  explicitLabel?: string
+): string {
+  if (explicitLabel) return explicitLabel;
+  const extracted = extractNodeText(children);
+  if (extracted !== "") return extracted;
+  if (fallbackValue !== undefined && fallbackValue !== null) {
+    return Array.isArray(fallbackValue) ? fallbackValue.join("") : String(fallbackValue);
+  }
+  return "";
+}
+
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   (
     {
@@ -86,10 +117,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           const childProps = child.props as React.OptionHTMLAttributes<HTMLOptionElement>;
           items.push({
             value: (childProps.value as string | number) ?? "",
-            label:
-              typeof childProps.children === "string"
-                ? childProps.children
-                : String(childProps.children ?? childProps.value ?? ""),
+            label: getOptionLabel(childProps.children, childProps.value, childProps.label),
             disabled: Boolean(childProps.disabled),
           });
         }

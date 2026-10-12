@@ -641,7 +641,7 @@ export default function Expenses() {
             <option value="">Select account</option>
             {accounts.map((acc) => (
               <option key={acc.id} value={acc.id}>
-                {acc.name} ({acc.baseCurrency})
+                {`${acc.name} (${acc.baseCurrency})`}
               </option>
             ))}
           </Select>
