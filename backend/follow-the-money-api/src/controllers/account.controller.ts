@@ -102,8 +102,8 @@ export async function createAccount(req: AuthRequest, res: Response) {
     }
 
     const parsedBalance = Number(balance);
-    if (Number.isNaN(parsedBalance)) {
-        return res.status(400).json({ message: "Invalid balance" });
+    if (Number.isNaN(parsedBalance) || parsedBalance < 0) {
+        return res.status(400).json({ message: "Balance cannot be negative" });
     }
 
     const parsedBaseCurrency: Currency = (baseCurrency || "EUR") as Currency;
@@ -152,8 +152,8 @@ export async function updateAccount(req: AuthRequest, res: Response) {
     }
 
     const parsedBalance = Number(balance);
-    if (Number.isNaN(parsedBalance)) {
-        return res.status(400).json({ message: "Invalid balance" });
+    if (Number.isNaN(parsedBalance) || parsedBalance < 0) {
+        return res.status(400).json({ message: "Balance cannot be negative" });
     }
 
     const parsedBaseCurrency: Currency = (baseCurrency || "EUR") as Currency;

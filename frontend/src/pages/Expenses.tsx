@@ -489,10 +489,24 @@ export default function Expenses() {
       return;
     }
 
+    const numericAmount = Number(amount);
+    if (Number.isNaN(numericAmount) || numericAmount <= 0) {
+      setError("Amount must be a positive number.");
+      return;
+    }
+
+    const payingAccount = accounts.find((a) => a.id === selectedAccountId);
+    if (payingAccount && numericAmount > payingAccount.balance) {
+      setError(
+        `Insufficient balance in ${payingAccount.name}. Current balance is ${payingAccount.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${payingAccount.baseCurrency}, but expense is ${numericAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${payingAccount.baseCurrency}. You cannot put an account into a negative balance.`
+      );
+      return;
+    }
+
     try {
       setSubmitting(true);
       await api.post("/expenses", {
-        amount: Number(amount),
+        amount: numericAmount,
         date,
         category,
         description: description.trim() || undefined,
@@ -506,7 +520,11 @@ export default function Expenses() {
       setSelectedAccountId("");
       await fetchData();
     } catch (err: any) {
-      setError(err.response?.data?.error || "Failed to create expense");
+      setError(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to create expense"
+      );
     } finally {
       setSubmitting(false);
     }
@@ -527,7 +545,11 @@ export default function Expenses() {
       setEditingExpense(null);
       await fetchData();
     } catch (err: any) {
-      setEditError(err.response?.data?.error || "Failed to update expense");
+      setEditError(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to update expense"
+      );
     } finally {
       setEditSubmitting(false);
     }
@@ -538,8 +560,21 @@ export default function Expenses() {
       id: a.id,
       name: a.name,
       baseCurrency: a.baseCurrency,
+      balance: a.balance,
     }));
   }, [accounts]);
+
+  const selectedPayingAccount =
+    typeof selectedAccountId === "number"
+      ? accounts.find((a) => a.id === selectedAccountId) || null
+      : null;
+
+  const numAmount = Number(amount);
+  const isCreateExpenseInsufficient =
+    !!selectedPayingAccount &&
+    !Number.isNaN(numAmount) &&
+    numAmount > 0 &&
+    numAmount > selectedPayingAccount.balance;
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -632,25 +667,46 @@ export default function Expenses() {
             placeholder="Groceries, Uber, etc."
           />
 
-          <Select
-            label="Paid From"
-            value={selectedAccountId}
-            onChange={(e) => setSelectedAccountId(e.target.value ? Number(e.target.value) : "")}
-            required
-          >
-            <option value="">Select account</option>
-            {accounts.map((acc) => (
-              <option key={acc.id} value={acc.id}>
-                {`${acc.name} (${acc.baseCurrency})`}
-              </option>
-            ))}
-          </Select>
+          <div>
+            <Select
+              label="Paid From"
+              value={selectedAccountId}
+              onChange={(e) => setSelectedAccountId(e.target.value ? Number(e.target.value) : "")}
+              required
+            >
+              <option value="">Select account</option>
+              {accounts.map((acc) => (
+                <option key={acc.id} value={acc.id}>
+                  {`${acc.name} (${acc.baseCurrency})`}
+                </option>
+              ))}
+            </Select>
+            {selectedPayingAccount && (
+              <div className="mt-1.5 flex items-center justify-between px-1 text-xs">
+                <span className="text-slate-500 dark:text-slate-400">Available:</span>
+                <span
+                  className={`font-mono font-semibold ${
+                    selectedPayingAccount.balance < 0
+                      ? "text-rose-600 dark:text-rose-400"
+                      : "text-emerald-600 dark:text-emerald-400"
+                  }`}
+                >
+                  {selectedPayingAccount.balance.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  {selectedPayingAccount.baseCurrency}
+                </span>
+              </div>
+            )}
+          </div>
 
           <div className="flex items-end">
             <Button
               type="submit"
               variant="primary"
               size="md"
+              disabled={Boolean(isCreateExpenseInsufficient)}
               isLoading={submitting}
               leftIcon={<Plus className="h-4 w-4" />}
               className="w-full"
@@ -659,6 +715,31 @@ export default function Expenses() {
             </Button>
           </div>
         </form>
+
+        {isCreateExpenseInsufficient && selectedPayingAccount && (
+          <div
+            role="alert"
+            className="mt-4 rounded-2xl border border-rose-200/80 bg-rose-50/80 p-3.5 text-xs leading-relaxed text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+          >
+            <strong>Insufficient Balance:</strong> You only have{" "}
+            <span className="font-mono font-bold">
+              {selectedPayingAccount.balance.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{" "}
+              {selectedPayingAccount.baseCurrency}
+            </span>{" "}
+            in {selectedPayingAccount.name}, but this expense is for{" "}
+            <span className="font-mono font-bold">
+              {numAmount.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{" "}
+              {selectedPayingAccount.baseCurrency}
+            </span>
+            . You cannot put an account into a negative balance.
+          </div>
+        )}
       </Card>
 
       {/* Filter Ledger Bar */}

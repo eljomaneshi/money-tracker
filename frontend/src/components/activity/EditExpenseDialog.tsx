@@ -61,6 +61,25 @@ export function EditExpenseDialog({
     }
   }, [expense]);
 
+  const selectedAccount =
+    typeof accountId === "number"
+      ? accounts.find((a) => a.id === accountId) || null
+      : null;
+
+  const isSameAccount =
+    !!expense && typeof accountId === "number" && expense.accountId === accountId;
+  const effectiveAvailable =
+    selectedAccount && selectedAccount.balance !== undefined
+      ? selectedAccount.balance + (isSameAccount ? Number(expense.amount) : 0)
+      : undefined;
+
+  const numAmount = Number(amount);
+  const isInsufficient =
+    selectedAccount &&
+    effectiveAvailable !== undefined &&
+    !Number.isNaN(numAmount) &&
+    numAmount > effectiveAvailable;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError("");
@@ -75,9 +94,15 @@ export function EditExpenseDialog({
       return;
     }
 
-    const numAmount = Number(amount);
     if (Number.isNaN(numAmount) || numAmount <= 0) {
       setLocalError("Amount must be a positive number.");
+      return;
+    }
+
+    if (isInsufficient && selectedAccount && effectiveAvailable !== undefined) {
+      setLocalError(
+        `Insufficient balance in ${selectedAccount.name}. Available balance is ${effectiveAvailable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${selectedAccount.baseCurrency}, but updated expense is ${numAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${selectedAccount.baseCurrency}. You cannot put an account into a negative balance.`
+      );
       return;
     }
 
@@ -160,20 +185,59 @@ export function EditExpenseDialog({
             <option value="Other">Other</option>
           </Select>
 
-          <Select
-            label="Paid From"
-            value={accountId}
-            onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : "")}
-            required
-          >
-            <option value="">Select account</option>
-            {accounts.map((acc) => (
-              <option key={acc.id} value={acc.id}>
-                {`${acc.name} (${acc.baseCurrency})`}
-              </option>
-            ))}
-          </Select>
+          <div>
+            <Select
+              label="Paid From"
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : "")}
+              required
+            >
+              <option value="">Select account</option>
+              {accounts.map((acc) => (
+                <option key={acc.id} value={acc.id}>
+                  {`${acc.name} (${acc.baseCurrency})`}
+                </option>
+              ))}
+            </Select>
+            {selectedAccount && effectiveAvailable !== undefined && (
+              <div className="mt-1.5 flex items-center justify-between px-1 text-xs">
+                <span className="text-slate-500 dark:text-slate-400">Available:</span>
+                <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                  {effectiveAvailable.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  {selectedAccount.baseCurrency}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
+
+        {isInsufficient && selectedAccount && effectiveAvailable !== undefined && (
+          <div
+            role="alert"
+            className="rounded-2xl border border-rose-200/80 bg-rose-50/80 p-3.5 text-xs leading-relaxed text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+          >
+            <strong>Insufficient Balance:</strong> You have{" "}
+            <span className="font-mono font-bold">
+              {effectiveAvailable.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{" "}
+              {selectedAccount.baseCurrency}
+            </span>{" "}
+            available in {selectedAccount.name}, but this updated expense requires{" "}
+            <span className="font-mono font-bold">
+              {numAmount.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{" "}
+              {selectedAccount.baseCurrency}
+            </span>
+            . You cannot put an account into a negative balance.
+          </div>
+        )}
 
         <Input
           label="Description"
@@ -198,6 +262,7 @@ export function EditExpenseDialog({
             type="submit"
             variant="primary"
             size="md"
+            disabled={Boolean(isInsufficient)}
             isLoading={isSaving}
             leftIcon={<Save className="h-4 w-4" />}
           >

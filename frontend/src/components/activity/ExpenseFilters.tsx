@@ -15,6 +15,7 @@ export interface AccountOption {
   id: number;
   name: string;
   baseCurrency: Currency;
+  balance?: number;
 }
 
 export interface TotalsData {

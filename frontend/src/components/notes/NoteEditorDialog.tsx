@@ -153,8 +153,8 @@ export function NoteEditorDialog({
               onChange={(e) => setType(e.target.value as NoteType)}
               options={[
                 { value: "GENERAL", label: "General Note" },
-                { value: "TO_RECEIVE", label: "To Receive (Receivable)" },
-                { value: "TO_PAY", label: "To Pay (Payable)" },
+                { value: "TO_RECEIVE", label: "To Receive" },
+                { value: "TO_PAY", label: "To Pay" },
                 { value: "REMINDER", label: "Reminder" },
               ]}
             />
@@ -175,7 +175,7 @@ export function NoteEditorDialog({
               value={repeatPeriod}
               onChange={(e) => setRepeatPeriod(e.target.value as RepeatPeriod)}
               options={[
-                { value: "NONE", label: "Does not repeat" },
+                { value: "NONE", label: "No Repeat" },
                 { value: "MONTHLY", label: "Monthly" },
                 { value: "YEARLY", label: "Yearly" },
               ]}

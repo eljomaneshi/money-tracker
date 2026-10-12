@@ -95,6 +95,13 @@ export function AccountActionDialog({
       ? "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
       : "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300";
 
+  const numAmount = Number(amount);
+  const isInsufficientBalance =
+    (actionType === "WITHDRAWAL" || actionType === "TRANSFER") &&
+    !!selectedFromAccount &&
+    !Number.isNaN(numAmount) &&
+    numAmount > selectedFromAccount.balance;
+
   return (
     <Dialog
       isOpen={isOpen}
@@ -126,6 +133,112 @@ export function AccountActionDialog({
 
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {actionType === "TRANSFER" ? (
+            <>
+              <div>
+                <Select
+                  label="Source Account (From)"
+                  value={fromAccountId}
+                  onChange={(e) => setFromAccountId(e.target.value ? Number(e.target.value) : "")}
+                  required
+                >
+                  <option value="">Select source account</option>
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {`${acc.name} (${acc.baseCurrency})`}
+                    </option>
+                  ))}
+                </Select>
+                {selectedFromAccount && (
+                  <div className="mt-1.5 flex items-center justify-between px-1 text-xs">
+                    <span className="text-slate-500 dark:text-slate-400">Available Balance:</span>
+                    <span
+                      className={`font-mono font-semibold ${
+                        selectedFromAccount.balance < 0
+                          ? "text-rose-600 dark:text-rose-400"
+                          : "text-emerald-600 dark:text-emerald-400"
+                      }`}
+                    >
+                      {selectedFromAccount.balance.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}{" "}
+                      {selectedFromAccount.baseCurrency}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <Select
+                  label="Destination Account (To)"
+                  value={toAccountId}
+                  onChange={(e) => setToAccountId(e.target.value ? Number(e.target.value) : "")}
+                  required
+                >
+                  <option value="">Select destination account</option>
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {`${acc.name} (${acc.baseCurrency})`}
+                    </option>
+                  ))}
+                </Select>
+                {selectedToAccount && (
+                  <div className="mt-1.5 flex items-center justify-between px-1 text-xs">
+                    <span className="text-slate-500 dark:text-slate-400">Current Balance:</span>
+                    <span
+                      className={`font-mono font-semibold ${
+                        selectedToAccount.balance < 0
+                          ? "text-rose-600 dark:text-rose-400"
+                          : "text-emerald-600 dark:text-emerald-400"
+                      }`}
+                    >
+                      {selectedToAccount.balance.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}{" "}
+                      {selectedToAccount.baseCurrency}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="sm:col-span-2">
+              <Select
+                label="Account"
+                value={fromAccountId}
+                onChange={(e) => setFromAccountId(e.target.value ? Number(e.target.value) : "")}
+                required
+              >
+                <option value="">Select account</option>
+                {accounts.map((acc) => (
+                  <option key={acc.id} value={acc.id}>
+                    {`${acc.name} (${acc.baseCurrency})`}
+                  </option>
+                ))}
+              </Select>
+              {selectedFromAccount && (
+                <div className="mt-1.5 flex items-center justify-between px-1 text-xs">
+                  <span className="text-slate-500 dark:text-slate-400">Available Balance:</span>
+                  <span
+                    className={`font-mono font-semibold ${
+                      selectedFromAccount.balance < 0
+                        ? "text-rose-600 dark:text-rose-400"
+                        : "text-emerald-600 dark:text-emerald-400"
+                    }`}
+                  >
+                    {selectedFromAccount.balance.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{" "}
+                    {selectedFromAccount.baseCurrency}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
           <Input
             label={actionType === "TRANSFER" ? "Amount Sent" : "Amount"}
             type="number"
@@ -136,19 +249,6 @@ export function AccountActionDialog({
             placeholder="100.00"
             required
           />
-
-          {isCrossCurrencyTransfer && (
-            <Input
-              label="Amount Received (Destination)"
-              type="number"
-              min="0"
-              step="0.01"
-              value={targetAmount}
-              onChange={(e) => setTargetAmount(e.target.value)}
-              placeholder="9500.00"
-              required
-            />
-          )}
 
           <div className="w-full">
             <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -163,50 +263,19 @@ export function AccountActionDialog({
             />
           </div>
 
-          {actionType === "TRANSFER" ? (
-            <>
-              <Select
-                label="Source Account (From)"
-                value={fromAccountId}
-                onChange={(e) => setFromAccountId(e.target.value ? Number(e.target.value) : "")}
+          {isCrossCurrencyTransfer && (
+            <div className="sm:col-span-2">
+              <Input
+                label="Amount Received (Destination)"
+                type="number"
+                min="0"
+                step="0.01"
+                value={targetAmount}
+                onChange={(e) => setTargetAmount(e.target.value)}
+                placeholder="9500.00"
                 required
-              >
-                <option value="">Select source account</option>
-                {accounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {`${acc.name} (${acc.baseCurrency})`}
-                  </option>
-                ))}
-              </Select>
-
-              <Select
-                label="Destination Account (To)"
-                value={toAccountId}
-                onChange={(e) => setToAccountId(e.target.value ? Number(e.target.value) : "")}
-                required
-              >
-                <option value="">Select destination account</option>
-                {accounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {`${acc.name} (${acc.baseCurrency})`}
-                  </option>
-                ))}
-              </Select>
-            </>
-          ) : (
-            <Select
-              label="Account"
-              value={fromAccountId}
-              onChange={(e) => setFromAccountId(e.target.value ? Number(e.target.value) : "")}
-              required
-            >
-              <option value="">Select account</option>
-              {accounts.map((acc) => (
-                <option key={acc.id} value={acc.id}>
-                  {`${acc.name} (${acc.baseCurrency})`}
-                </option>
-              ))}
-            </Select>
+              />
+            </div>
           )}
         </div>
 
@@ -216,6 +285,31 @@ export function AccountActionDialog({
             <span className="font-mono font-bold">{selectedFromAccount.baseCurrency}</span> to{" "}
             <span className="font-mono font-bold">{selectedToAccount.baseCurrency}</span>. Please enter the
             exact amount credited after foreign exchange conversion.
+          </div>
+        )}
+
+        {isInsufficientBalance && selectedFromAccount && (
+          <div
+            role="alert"
+            className="rounded-2xl border border-rose-200/80 bg-rose-50/80 p-3.5 text-xs leading-relaxed text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+          >
+            <strong>Insufficient Balance:</strong> You only have{" "}
+            <span className="font-mono font-bold">
+              {selectedFromAccount.balance.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{" "}
+              {selectedFromAccount.baseCurrency}
+            </span>{" "}
+            in {selectedFromAccount.name}, but this {actionType.toLowerCase()} is for{" "}
+            <span className="font-mono font-bold">
+              {numAmount.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{" "}
+              {selectedFromAccount.baseCurrency}
+            </span>
+            . You cannot put an account into a negative balance.
           </div>
         )}
 
@@ -235,6 +329,7 @@ export function AccountActionDialog({
             type="submit"
             variant="primary"
             size="md"
+            disabled={isInsufficientBalance}
             isLoading={submitting}
             leftIcon={<Save className="h-4 w-4" />}
           >

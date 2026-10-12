@@ -39,7 +39,7 @@ export async function processDueSubscriptionsForUser(userId: number) {
                 },
             });
 
-            if (!account) {
+            if (!account || account.balance < sub.price) {
                 return;
             }
 

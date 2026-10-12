@@ -57,6 +57,12 @@ export async function createExpense(req: AuthRequest, res: Response) {
             return res.status(404).json({ message: "Account not found" });
         }
 
+        if (account.balance < numericAmount) {
+            return res.status(400).json({
+                message: `Insufficient balance in ${account.name}. Current balance is ${account.balance.toFixed(2)} ${account.baseCurrency}, but expense is ${numericAmount.toFixed(2)} ${account.baseCurrency}. You cannot put an account into a negative balance.`,
+            });
+        }
+
         linkedAccountId = id;
     }
 
@@ -183,6 +189,17 @@ export async function updateExpense(req: AuthRequest, res: Response) {
             if (oldAccountId && parsedAccountId && oldAccountId === parsedAccountId) {
                 const diff = oldAmount - parsedAmount;
 
+                if (diff < 0) {
+                    const currentAccount = await tx.account.findUnique({
+                        where: { id: oldAccountId },
+                    });
+                    if (currentAccount && currentAccount.balance < -diff) {
+                        throw new Error(
+                            `Insufficient balance in ${currentAccount.name}. Current balance is ${currentAccount.balance.toFixed(2)} ${currentAccount.baseCurrency}, but expense increase requires ${(-diff).toFixed(2)} ${currentAccount.baseCurrency}. You cannot put an account into a negative balance.`
+                        );
+                    }
+                }
+
                 await tx.account.update({
                     where: { id: oldAccountId },
                     data: {
@@ -192,6 +209,20 @@ export async function updateExpense(req: AuthRequest, res: Response) {
                     },
                 });
             } else {
+                if (parsedAccountId) {
+                    const targetAccount = await tx.account.findUnique({
+                        where: { id: parsedAccountId },
+                    });
+                    if (!targetAccount) {
+                        throw new Error("Target account not found");
+                    }
+                    if (targetAccount.balance < parsedAmount) {
+                        throw new Error(
+                            `Insufficient balance in ${targetAccount.name}. Current balance is ${targetAccount.balance.toFixed(2)} ${targetAccount.baseCurrency}, but expense requires ${parsedAmount.toFixed(2)} ${targetAccount.baseCurrency}. You cannot put an account into a negative balance.`
+                        );
+                    }
+                }
+
                 if (oldAccountId) {
                     await tx.account.update({
                         where: { id: oldAccountId },
@@ -233,6 +264,12 @@ export async function updateExpense(req: AuthRequest, res: Response) {
         });
     } catch (err: any) {
         console.error(err);
+        if (err.message && err.message.startsWith("Insufficient balance")) {
+            return res.status(400).json({ message: err.message });
+        }
+        if (err.message === "Expense not found" || err.message === "Target account not found") {
+            return res.status(404).json({ message: err.message });
+        }
         return res.status(500).json({
             message: err.message || "Failed to update expense",
         });

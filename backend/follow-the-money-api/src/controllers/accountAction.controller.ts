@@ -126,6 +126,12 @@ export async function withdrawFromAccount(req: AuthRequest, res: Response) {
                 throw new Error("Account not found");
             }
 
+            if (account.balance < parsedAmount) {
+                throw new Error(
+                    `Insufficient balance in ${account.name}. Current balance is ${account.balance.toFixed(2)} ${account.baseCurrency}, but withdrawal amount is ${parsedAmount.toFixed(2)} ${account.baseCurrency}. You cannot put an account into a negative balance.`
+                );
+            }
+
             const updatedAccount = await tx.account.update({
                 where: { id: account.id },
                 data: {
@@ -152,6 +158,12 @@ export async function withdrawFromAccount(req: AuthRequest, res: Response) {
         return res.status(201).json(result);
     } catch (err: any) {
         console.error(err);
+        if (err.message && err.message.startsWith("Insufficient balance")) {
+            return res.status(400).json({ message: err.message });
+        }
+        if (err.message === "Account not found") {
+            return res.status(404).json({ message: err.message });
+        }
         return res.status(500).json({
             message: err.message || "Failed to withdraw money",
         });
@@ -211,7 +223,9 @@ export async function transferBetweenAccounts(req: AuthRequest, res: Response) {
             }
 
             if (fromAccount.balance < parsedAmount) {
-                throw new Error("Insufficient balance in source account");
+                throw new Error(
+                    `Insufficient balance in source account ${fromAccount.name}. Current balance is ${fromAccount.balance.toFixed(2)} ${fromAccount.baseCurrency}, but transfer amount is ${parsedAmount.toFixed(2)} ${fromAccount.baseCurrency}. You cannot put an account into a negative balance.`
+                );
             }
 
             const sameCurrency = fromAccount.baseCurrency === toAccount.baseCurrency;
@@ -262,6 +276,12 @@ export async function transferBetweenAccounts(req: AuthRequest, res: Response) {
         return res.status(201).json(result);
     } catch (err: any) {
         console.error(err);
+        if (err.message && err.message.startsWith("Insufficient balance")) {
+            return res.status(400).json({ message: err.message });
+        }
+        if (err.message === "Account not found") {
+            return res.status(404).json({ message: err.message });
+        }
         return res.status(500).json({
             message: err.message || "Failed to transfer money",
         });

@@ -142,15 +142,32 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       ? String(value)
       : "Select...";
 
-    // Determine dropdown direction (up vs down) based on viewport room
+    // Determine dropdown direction (up vs down) based on viewport room and dialog containers
     const checkDropdownDirection = () => {
       if (!triggerRef.current) return;
       const rect = triggerRef.current.getBoundingClientRect();
       const estimatedHeight = Math.min(parsedOptions.length * 44 + 16, 240);
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
+      let spaceBelow = window.innerHeight - rect.bottom;
+      let spaceAbove = rect.top;
 
-      if (spaceBelow < estimatedHeight && spaceAbove > spaceBelow) {
+      const dialogOrScrollParent = triggerRef.current.closest(
+        "[role='dialog'] [class*='rounded-'], [role='dialog'], .overflow-y-auto"
+      );
+      if (dialogOrScrollParent) {
+        const parentRect = dialogOrScrollParent.getBoundingClientRect();
+        const containerSpaceBelow = parentRect.bottom - rect.bottom;
+        const containerSpaceAbove = rect.top - parentRect.top;
+        if (containerSpaceBelow < spaceBelow) {
+          spaceBelow = containerSpaceBelow;
+        }
+        if (containerSpaceAbove < spaceAbove) {
+          spaceAbove = containerSpaceAbove;
+        }
+      }
+
+      if (spaceBelow < estimatedHeight + 36 && spaceAbove >= estimatedHeight) {
+        setOpenUpward(true);
+      } else if (spaceBelow < estimatedHeight && spaceAbove > spaceBelow) {
         setOpenUpward(true);
       } else {
         setOpenUpward(false);
@@ -385,7 +402,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             tabIndex={-1}
             aria-labelledby={computedLabelledBy}
             aria-label={computedAriaLabel}
-            className={`absolute left-0 right-0 z-50 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl transition-all duration-150 dark:border-white/10 dark:bg-[#0b1120] max-h-60 overflow-y-auto ${
+            className={`absolute left-0 min-w-full w-max max-w-[min(480px,calc(100vw-2rem))] z-50 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl transition-all duration-150 dark:border-white/10 dark:bg-[#0b1120] max-h-60 overflow-y-auto ${
               openUpward ? "bottom-full mb-1.5" : "top-full mt-1.5"
             }`}
           >
@@ -415,7 +432,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                       : "text-slate-700 dark:text-slate-200"
                   }`}
                 >
-                  <span className="truncate">{opt.label}</span>
+                  <span className="truncate whitespace-nowrap">{opt.label}</span>
                   {isSelected && (
                     <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400 ml-2" />
                   )}

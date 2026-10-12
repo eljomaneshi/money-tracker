@@ -172,19 +172,29 @@ export default function Balance() {
       return;
     }
 
+    const numBalance = Number(balance);
+    if (Number.isNaN(numBalance) || numBalance < 0) {
+      setError("Opening balance cannot be negative.");
+      return;
+    }
+
     try {
       setSubmitting(true);
       await api.post("/accounts", {
         name: name.trim(),
         type,
-        balance: Number(balance),
+        balance: numBalance,
         baseCurrency,
       });
       resetCreateForm();
       await fetchData();
     } catch (err: any) {
       console.error(err);
-      setError(err.response?.data?.error || "Failed to create account");
+      setError(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to create account"
+      );
     } finally {
       setSubmitting(false);
     }
@@ -221,19 +231,29 @@ export default function Balance() {
       return;
     }
 
+    const numEditBalance = Number(editBalance);
+    if (Number.isNaN(numEditBalance) || numEditBalance < 0) {
+      setEditError("Balance cannot be negative.");
+      return;
+    }
+
     try {
       setEditSubmitting(true);
       await api.patch(`/accounts/${editingAccount.id}`, {
         name: editName.trim(),
         type: editType,
-        balance: Number(editBalance),
+        balance: numEditBalance,
         baseCurrency: editBaseCurrency,
       });
       closeEditModal();
       await fetchData();
     } catch (err: any) {
       console.error(err);
-      setEditError(err.response?.data?.error || "Failed to update account");
+      setEditError(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to update account"
+      );
     } finally {
       setEditSubmitting(false);
     }
@@ -316,6 +336,30 @@ export default function Balance() {
       }
     }
 
+    const numericAmount = Number(actionAmount);
+    if (Number.isNaN(numericAmount) || numericAmount <= 0) {
+      setActionError("Amount must be greater than 0");
+      return;
+    }
+
+    if (actionType === "WITHDRAWAL" && selectedFrom) {
+      if (numericAmount > selectedFrom.balance) {
+        setActionError(
+          `Insufficient balance in ${selectedFrom.name}. Current balance is ${selectedFrom.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${selectedFrom.baseCurrency}, but you entered ${numericAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${selectedFrom.baseCurrency}. You cannot put an account into a negative balance.`
+        );
+        return;
+      }
+    }
+
+    if (actionType === "TRANSFER" && selectedFrom) {
+      if (numericAmount > selectedFrom.balance) {
+        setActionError(
+          `Insufficient balance in source account ${selectedFrom.name}. Current balance is ${selectedFrom.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${selectedFrom.baseCurrency}, but transfer amount is ${numericAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${selectedFrom.baseCurrency}. You cannot put an account into a negative balance.`
+        );
+        return;
+      }
+    }
+
     try {
       setActionSubmitting(true);
 
@@ -348,7 +392,11 @@ export default function Balance() {
       await fetchData();
     } catch (err: any) {
       console.error(err);
-      setActionError(err.response?.data?.error || "Failed to record transaction action");
+      setActionError(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to record transaction action"
+      );
     } finally {
       setActionSubmitting(false);
     }
@@ -539,6 +587,7 @@ export default function Balance() {
             <Input
               label="Opening Balance"
               type="number"
+              min="0"
               step="0.01"
               value={balance}
               onChange={(e) => setBalance(e.target.value)}
