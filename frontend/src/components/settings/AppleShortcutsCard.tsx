@@ -80,7 +80,11 @@ export function AppleShortcutsCard() {
   const [showGuide, setShowGuide] = useState(true);
 
   // Webhook URLs
-  const prodWebhookUrl = "https://moneytracker.online/integrations/quick-expense";
+  const prodBase =
+    import.meta.env.VITE_API_URL && !import.meta.env.VITE_API_URL.includes("localhost")
+      ? import.meta.env.VITE_API_URL.replace(/\/$/, "")
+      : "https://moneytracker.online";
+  const prodWebhookUrl = `${prodBase}/integrations/quick-expense`;
   const localHostIp =
     typeof window !== "undefined" && window.location.hostname !== "localhost"
       ? window.location.hostname

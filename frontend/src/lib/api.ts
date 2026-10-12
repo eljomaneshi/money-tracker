@@ -14,15 +14,19 @@ export function setSessionExpiryHandler(
 }
 
 const getBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  // If a production or custom remote API URL is configured (not localhost), always respect it!
+  if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
+    return envUrl;
+  }
+
+  // In local dev (both on PC and on mobile LAN), route through window.location.origin
+  // so Vite dev proxy safely relays calls to port 4000 with zero CORS and zero firewall blocks.
   if (typeof window !== "undefined" && window.location.hostname) {
-    if (window.location.hostname.includes("moneytracker.online")) {
-      return "https://moneytracker.online";
-    }
-    // In local dev (both on PC and on mobile LAN), route through window.location.origin
-    // so Vite proxy safely relays calls to port 4000 with zero CORS and zero firewall blocks.
     return window.location.origin;
   }
-  return import.meta.env.VITE_API_URL || "http://localhost:4000";
+
+  return envUrl || "http://localhost:4000";
 };
 
 const api = axios.create({
