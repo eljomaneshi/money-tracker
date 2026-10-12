@@ -49,7 +49,7 @@ export function AppleShortcutsCard() {
     typeof window !== "undefined" && window.location.hostname !== "localhost"
       ? window.location.hostname
       : "192.168.1.104";
-  const localWebhookUrl = `http://${localHostIp}:4000/integrations/quick-expense`;
+  const localWebhookUrl = `http://${localHostIp}:5173/integrations/quick-expense`;
   const [selectedEnv, setSelectedEnv] = useState<"prod" | "local">("prod");
   const webhookUrl = selectedEnv === "prod" ? prodWebhookUrl : localWebhookUrl;
 
