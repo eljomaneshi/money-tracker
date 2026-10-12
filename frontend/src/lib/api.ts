@@ -13,8 +13,16 @@ export function setSessionExpiryHandler(
   sessionExpiryHandler = handler;
 }
 
+const getBaseUrl = () => {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  if (typeof window !== "undefined" && window.location.hostname) {
+    return `http://${window.location.hostname}:4000`;
+  }
+  return "http://localhost:4000";
+};
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:4000",
+  baseURL: getBaseUrl(),
   headers: {
     "Content-Type": "application/json",
   },

@@ -29,7 +29,12 @@ const allowedOrigins = [
 const corsOptions = {
     origin: (origin: string | undefined, callback: Function) => {
         if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin)) return callback(null, true);
+        if (
+            allowedOrigins.includes(origin) ||
+            /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(origin)
+        ) {
+            return callback(null, true);
+        }
         return callback(new Error(`CORS blocked for origin: ${origin}`));
     },
     credentials: true,

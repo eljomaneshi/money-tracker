@@ -43,11 +43,15 @@ export function AppleShortcutsCard() {
   // Active instructions tab
   const [showGuide, setShowGuide] = useState(true);
 
-  // Webhook URL: prefer production domain or current host
-  const webhookUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin.includes("localhost") ? "https://moneytracker.online" : window.location.origin}/integrations/quick-expense`
-      : "https://moneytracker.online/integrations/quick-expense";
+  // Webhook URLs
+  const prodWebhookUrl = "https://moneytracker.online/integrations/quick-expense";
+  const localHostIp =
+    typeof window !== "undefined" && window.location.hostname !== "localhost"
+      ? window.location.hostname
+      : "192.168.1.104";
+  const localWebhookUrl = `http://${localHostIp}:4000/integrations/quick-expense`;
+  const [selectedEnv, setSelectedEnv] = useState<"prod" | "local">("prod");
+  const webhookUrl = selectedEnv === "prod" ? prodWebhookUrl : localWebhookUrl;
 
   useEffect(() => {
     loadApiKey();
@@ -258,10 +262,37 @@ export function AppleShortcutsCard() {
 
         {/* Webhook Endpoint Box */}
         <div className="mt-4 border-t border-slate-200/80 pt-4 dark:border-white/5">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Webhook Target URL
-          </p>
-          <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Webhook Target URL
+            </p>
+            {/* Environment Toggle */}
+            <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-0.5 dark:border-white/10 dark:bg-white/5">
+              <button
+                type="button"
+                onClick={() => setSelectedEnv("prod")}
+                className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${
+                  selectedEnv === "prod"
+                    ? "bg-white text-indigo-700 shadow-sm dark:bg-white/15 dark:text-indigo-300"
+                    : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+                }`}
+              >
+                Production (Cloud / Cellular)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedEnv("local")}
+                className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${
+                  selectedEnv === "local"
+                    ? "bg-white text-indigo-700 shadow-sm dark:bg-white/15 dark:text-indigo-300"
+                    : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+                }`}
+              >
+                Local Network (Wi-Fi Test)
+              </button>
+            </div>
+          </div>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <code className="break-all rounded-xl border border-slate-200/90 bg-white px-3 py-2 font-mono text-xs text-slate-800 dark:border-white/10 dark:bg-[#0c1424] dark:text-slate-200">
               {webhookUrl}
             </code>
@@ -278,6 +309,11 @@ export function AppleShortcutsCard() {
               {copiedUrl ? "Copied URL!" : "Copy URL"}
             </button>
           </div>
+          {selectedEnv === "local" && (
+            <p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+              Note: Local URL only works when your iPhone is connected to the same Wi-Fi network as this PC ({localHostIp}).
+            </p>
+          )}
         </div>
       </div>
 
