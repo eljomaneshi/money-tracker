@@ -3,6 +3,17 @@ import crypto from "crypto";
 import prisma from "../prisma";
 import { AuthRequest } from "../middleware/auth";
 
+export interface ApplePayCardMapping {
+  cardName: string;
+  accountId: number;
+}
+
+export interface ApplePaySettings {
+  unmappedAction: "ignore" | "default";
+  defaultAccountId?: number | null;
+  cardMappings: ApplePayCardMapping[];
+}
+
 // Category auto-classification keywords
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
   Food: [
@@ -142,30 +153,69 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
     });
   }
 
+  // Parse user's Apple Pay multi-card settings
+  const rawSettings = (user.applePaySettings as any) || {};
+  const unmappedAction: "ignore" | "default" = rawSettings.unmappedAction || "ignore";
+  const defaultAccountId: number | null = rawSettings.defaultAccountId || null;
+  const cardMappings: ApplePayCardMapping[] = Array.isArray(rawSettings.cardMappings)
+    ? rawSettings.cardMappings
+    : [];
+
   // Match account
-  let matchedAccount = accounts[0]; // fallback to default account
+  let matchedAccount: typeof accounts[0] | null = null;
 
   if (cardName && typeof cardName === "string" && cardName.trim()) {
     const cardLower = cardName.trim().toLowerCase();
 
-    // 1. Exact match
-    const exactMatch = accounts.find((a) => a.name.toLowerCase() === cardLower);
-    if (exactMatch) {
-      matchedAccount = exactMatch;
-    } else {
-      // 2. Partial match
+    // 1. Explicit user card mapping
+    const explicitMapping = cardMappings.find(
+      (m) => m.cardName && m.cardName.trim().toLowerCase() === cardLower
+    );
+    if (explicitMapping) {
+      const found = accounts.find((a) => a.id === explicitMapping.accountId);
+      if (found) matchedAccount = found;
+    }
+
+    // 2. Exact match against account name
+    if (!matchedAccount) {
+      const exactMatch = accounts.find((a) => a.name.toLowerCase() === cardLower);
+      if (exactMatch) matchedAccount = exactMatch;
+    }
+
+    // 3. Partial keyword match (e.g. "BKT" in "BKT Visa Gold")
+    if (!matchedAccount) {
       const partialMatch = accounts.find(
         (a) => a.name.toLowerCase().includes(cardLower) || cardLower.includes(a.name.toLowerCase())
       );
-      if (partialMatch) {
-        matchedAccount = partialMatch;
-      } else {
-        // 3. Currency match
-        const currencyMatch = accounts.find((a) => a.baseCurrency.toLowerCase() === cardLower);
-        if (currencyMatch) {
-          matchedAccount = currencyMatch;
-        }
-      }
+      if (partialMatch) matchedAccount = partialMatch;
+    }
+
+    // 4. Currency match
+    if (!matchedAccount) {
+      const currencyMatch = accounts.find((a) => a.baseCurrency.toLowerCase() === cardLower);
+      if (currencyMatch) matchedAccount = currencyMatch;
+    }
+  }
+
+  // Handle unmapped card
+  if (!matchedAccount) {
+    if (unmappedAction === "ignore") {
+      return res.status(200).json({
+        success: true,
+        ignored: true,
+        message: `Transaction of ${numericAmount.toFixed(2)} at ${finalDescription} was skipped: Card "${cardName || "Unknown"}" is not linked to any Money Tracker account.`,
+      });
+    }
+
+    // Fall back to default account if specified
+    if (defaultAccountId) {
+      const def = accounts.find((a) => a.id === defaultAccountId);
+      if (def) matchedAccount = def;
+    }
+
+    // If still null, fall back to first account
+    if (!matchedAccount) {
+      matchedAccount = accounts[0];
     }
   }
 
@@ -272,5 +322,77 @@ export async function revokeApiKey(req: AuthRequest, res: Response) {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Failed to revoke API key" });
+  }
+}
+
+// Get Integration & Apple Pay Multi-Card Settings
+export async function getIntegrationSettings(req: AuthRequest, res: Response) {
+  if (!req.user) return res.status(401).json({ error: "Unauthorized" });
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: {
+        apiKey: true,
+        applePaySettings: true,
+      },
+    });
+
+    const parsedSettings = (user?.applePaySettings as any) || {};
+
+    return res.json({
+      apiKey: user?.apiKey || null,
+      settings: {
+        unmappedAction: parsedSettings.unmappedAction || "ignore",
+        defaultAccountId: parsedSettings.defaultAccountId || null,
+        cardMappings: Array.isArray(parsedSettings.cardMappings)
+          ? parsedSettings.cardMappings
+          : [],
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Failed to load integration settings" });
+  }
+}
+
+// Update Apple Pay Multi-Card Settings
+export async function updateIntegrationSettings(req: AuthRequest, res: Response) {
+  if (!req.user) return res.status(401).json({ error: "Unauthorized" });
+
+  const { unmappedAction, defaultAccountId, cardMappings } = req.body;
+
+  const validUnmappedAction =
+    unmappedAction === "default" ? "default" : "ignore";
+
+  const cleanMappings: ApplePayCardMapping[] = Array.isArray(cardMappings)
+    ? cardMappings
+        .filter((m) => m && typeof m.cardName === "string" && m.cardName.trim() && typeof m.accountId === "number")
+        .map((m) => ({
+          cardName: m.cardName.trim(),
+          accountId: m.accountId,
+        }))
+    : [];
+
+  try {
+    const user = await prisma.user.update({
+      where: { id: req.user.userId },
+      data: {
+        applePaySettings: {
+          unmappedAction: validUnmappedAction,
+          defaultAccountId: defaultAccountId ? Number(defaultAccountId) : null,
+          cardMappings: cleanMappings,
+        } as any,
+      },
+      select: { applePaySettings: true },
+    });
+
+    return res.json({
+      message: "Apple Pay settings saved successfully",
+      settings: user.applePaySettings,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Failed to save integration settings" });
   }
 }
