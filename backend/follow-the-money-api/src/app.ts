@@ -8,6 +8,7 @@ import accountRoutes from "./routes/account.routes";
 import { startSubscriptionCron } from "./cron/subscriptionCron";
 import noteRoutes from "./routes/note.routes";
 import accountActionRoutes from "./routes/accountAction.routes";
+import integrationRoutes from "./routes/integration.routes";
 import prisma from "./prisma";
 
 const app = express();
@@ -53,6 +54,7 @@ app.use("/expenses", expenseRoutes);
 app.use("/accounts", accountRoutes);
 app.use("/notes", noteRoutes);
 app.use("/account-actions", accountActionRoutes);
+app.use("/integrations", integrationRoutes);
 
 app.get("/health", async (_req: Request, res: Response) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");

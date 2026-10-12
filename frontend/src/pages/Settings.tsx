@@ -11,6 +11,7 @@ import {
 import api from "../lib/api";
 import { SettingsSection } from "../components/settings/SettingsSection";
 import { ExportDataCard } from "../components/settings/ExportDataCard";
+import { AppleShortcutsCard } from "../components/settings/AppleShortcutsCard";
 import { AiInsightsCard } from "../components/settings/AiInsightsCard";
 import { DangerZoneCard } from "../components/settings/DangerZoneCard";
 import { Button } from "../components/ui/Button";
@@ -716,7 +717,10 @@ export default function Settings() {
         </div>
       </SettingsSection>
 
-      {/* 5. Data Portability & Export */}
+      {/* 5. Apple Pay & iOS Shortcuts Automation */}
+      <AppleShortcutsCard />
+
+      {/* 6. Data Portability & Export */}
       <ExportDataCard />
 
       {/* 6. Claude AI Financial Insights */}
