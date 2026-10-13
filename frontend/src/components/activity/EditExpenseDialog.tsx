@@ -136,7 +136,7 @@ export function EditExpenseDialog({
         </div>
       }
       description="Update expense details and keep account balances synchronized."
-      maxWidth="lg"
+      maxWidth="xl"
     >
       {displayedError && (
         <div

@@ -158,7 +158,7 @@ export function ActivityLedgerTable({
                         </td>
 
                         {/* Date */}
-                        <td className="py-4 px-4 font-mono text-xs text-slate-500 dark:text-slate-400">
+                        <td className="py-4 px-4 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
                           <div className="flex flex-col">
                             <span className="font-semibold text-slate-800 dark:text-slate-200">
                               {formatActivityDate(exp.date)}
@@ -254,7 +254,7 @@ export function ActivityLedgerTable({
                       </td>
 
                       {/* Date */}
-                      <td className="py-4 px-4 font-mono text-xs text-slate-500 dark:text-slate-400">
+                      <td className="py-4 px-4 font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
                         <div className="flex flex-col">
                           <span className="font-semibold text-slate-800 dark:text-slate-200">
                             {formatActivityDate(action.date)}
@@ -325,7 +325,7 @@ export function ActivityLedgerTable({
                     <Landmark className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                     <span className="truncate">{getAccountName(exp.accountId, exp.account)}</span>
                   </div>
-                  <div className="flex flex-col items-end font-mono shrink-0">
+                  <div className="flex flex-col items-end font-mono shrink-0 whitespace-nowrap">
                     <span className="font-semibold text-slate-800 dark:text-slate-200">
                       {formatActivityDate(exp.date)}
                     </span>
@@ -406,7 +406,7 @@ export function ActivityLedgerTable({
                     </>
                   )}
                 </div>
-                <div className="flex flex-col items-end font-mono shrink-0">
+                <div className="flex flex-col items-end font-mono shrink-0 whitespace-nowrap">
                   <span className="font-semibold text-slate-800 dark:text-slate-200">
                     {formatActivityDate(action.date)}
                   </span>

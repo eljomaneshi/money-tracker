@@ -188,6 +188,12 @@ export function NoteEditorDialog({
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
+              onClick={(e) => {
+                try {
+                  e.currentTarget.showPicker?.();
+                } catch {}
+              }}
+              className="cursor-pointer"
             />
           </div>
         </div>
