@@ -102,22 +102,33 @@ export function AppleShortcutsCard() {
       setIsLoading(true);
       const [keyRes, accountsRes, settingsRes] = await Promise.all([
         api.get<{ apiKey: string | null }>("/integrations/api-key"),
-        api.get<Account[]>("/accounts"),
+        api.get<{ accounts?: Account[] } | Account[]>("/accounts"),
         api.get<{ apiKey: string | null; settings: ApplePaySettingsData }>("/integrations/settings"),
       ]);
 
-      setApiKey(keyRes.data.apiKey);
-      setAccounts(accountsRes.data || []);
+      const rawAccountsData = accountsRes.data;
+      const fetchedAccounts: Account[] = Array.isArray(rawAccountsData)
+        ? rawAccountsData
+        : Array.isArray((rawAccountsData as any)?.accounts)
+        ? (rawAccountsData as any).accounts
+        : [];
+
+      setApiKey(keyRes.data?.apiKey || null);
+      setAccounts(fetchedAccounts);
 
       if (settingsRes.data?.settings) {
         setUnmappedAction(settingsRes.data.settings.unmappedAction || "ignore");
         setDefaultAccountId(settingsRes.data.settings.defaultAccountId || null);
-        setCardMappings(settingsRes.data.settings.cardMappings || []);
-        if (!settingsRes.data.settings.defaultAccountId && accountsRes.data.length > 0) {
-          setDefaultAccountId(accountsRes.data[0].id);
+        setCardMappings(
+          Array.isArray(settingsRes.data.settings.cardMappings)
+            ? settingsRes.data.settings.cardMappings
+            : []
+        );
+        if (!settingsRes.data.settings.defaultAccountId && fetchedAccounts.length > 0) {
+          setDefaultAccountId(fetchedAccounts[0].id);
         }
-      } else if (accountsRes.data.length > 0) {
-        setDefaultAccountId(accountsRes.data[0].id);
+      } else if (fetchedAccounts.length > 0) {
+        setDefaultAccountId(fetchedAccounts[0].id);
       }
     } catch (err: any) {
       setError("Failed to load integration and card settings.");
@@ -125,6 +136,9 @@ export function AppleShortcutsCard() {
       setIsLoading(false);
     }
   };
+
+  const safeAccounts = Array.isArray(accounts) ? accounts : [];
+  const safeCardMappings = Array.isArray(cardMappings) ? cardMappings : [];
 
   const handleGenerateKey = async () => {
     try {
@@ -182,7 +196,7 @@ export function AppleShortcutsCard() {
       setError("Please enter the card name as it appears in Apple Wallet (e.g., 'BKT Visa Gold').");
       return;
     }
-    const targetAccountId = typeof newAccountId === "number" ? newAccountId : accounts[0]?.id;
+    const targetAccountId = typeof newAccountId === "number" ? newAccountId : safeAccounts[0]?.id;
     if (!targetAccountId) {
       setError("Please select a target account.");
       return;
@@ -488,14 +502,14 @@ export function AppleShortcutsCard() {
                 <p className="mt-1 text-slate-500 dark:text-slate-400 leading-normal">
                   Always log transactions from unmapped cards under a designated default account:
                 </p>
-                {unmappedAction === "default" && accounts.length > 0 && (
+                {unmappedAction === "default" && safeAccounts.length > 0 && (
                   <div className="mt-2">
                     <select
-                      value={defaultAccountId || accounts[0]?.id || ""}
+                      value={defaultAccountId || safeAccounts[0]?.id || ""}
                       onChange={(e) => setDefaultAccountId(Number(e.target.value))}
                       className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 dark:border-white/10 dark:bg-[#070b14] dark:text-slate-100"
                     >
-                      {accounts.map((acc) => (
+                      {safeAccounts.map((acc) => (
                         <option key={acc.id} value={acc.id}>
                           {acc.name} ({acc.baseCurrency})
                         </option>
@@ -512,14 +526,14 @@ export function AppleShortcutsCard() {
         <div className="mt-5 space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
-              Specific Card Mappings ({cardMappings.length})
+              Specific Card Mappings ({safeCardMappings.length})
             </p>
             <span className="text-[11px] text-slate-400">
               Matches card name sent from Apple Wallet
             </span>
           </div>
 
-          {cardMappings.length === 0 ? (
+          {safeCardMappings.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 p-4 text-center dark:border-white/10">
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 No custom card mappings configured yet. By default, card names matching your accounts (e.g., "BKT", "Revolut") will auto-link. Add explicit mappings below if names differ.
@@ -527,8 +541,8 @@ export function AppleShortcutsCard() {
             </div>
           ) : (
             <div className="space-y-2">
-              {cardMappings.map((mapping, idx) => {
-                const targetAcc = accounts.find((a) => a.id === mapping.accountId);
+              {safeCardMappings.map((mapping, idx) => {
+                const targetAcc = safeAccounts.find((a) => a.id === mapping.accountId);
                 return (
                   <div
                     key={idx}
@@ -577,11 +591,11 @@ export function AppleShortcutsCard() {
 
               <div className="sm:col-span-5">
                 <select
-                  value={newAccountId || (accounts[0]?.id ?? "")}
+                  value={newAccountId || (safeAccounts[0]?.id ?? "")}
                   onChange={(e) => setNewAccountId(Number(e.target.value))}
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-white/10 dark:bg-[#070b14] dark:text-slate-100"
                 >
-                  {accounts.map((acc) => (
+                  {safeAccounts.map((acc) => (
                     <option key={acc.id} value={acc.id}>
                       {acc.name} ({acc.baseCurrency})
                     </option>

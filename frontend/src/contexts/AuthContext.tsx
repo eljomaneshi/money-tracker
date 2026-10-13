@@ -13,17 +13,26 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("token");
+      if (saved) {
+        setAuthToken(saved);
+        return saved;
+      }
+    }
+    return null;
+  });
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     const savedToken = localStorage.getItem("token");
-    if (savedToken) {
+    if (savedToken && !token) {
       setToken(savedToken);
       setAuthToken(savedToken);
     }
-  }, []);
+  }, [token]);
 
   const login = async (email: string, password: string): Promise<void> => {
     const response = await api.post("/auth/login", { email, password });

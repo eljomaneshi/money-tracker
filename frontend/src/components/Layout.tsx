@@ -13,6 +13,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { ThemeToggle } from "./theme-toggle";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { QuickAction } from "./QuickAction";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -185,7 +186,9 @@ export default function Layout() {
           {/* Main View Container with safe bottom spacing for mobile bottom dock */}
           <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8 pb-28 lg:pb-8">
             <div className="mx-auto w-full max-w-7xl">
-              <Outlet />
+              <ErrorBoundary fallbackTitle="Unable to load this page">
+                <Outlet />
+              </ErrorBoundary>
             </div>
           </main>
         </div>
