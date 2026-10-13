@@ -65,7 +65,9 @@ textarea {
   max-width: 100%;
 }
 
-input[type="date"] {
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
   display: block;
   width: 100%;
   min-width: 0;
@@ -74,20 +76,27 @@ input[type="date"] {
   color-scheme: light;
 }
 
-.dark input[type="date"] {
+.dark input[type="date"],
+.dark input[type="time"],
+.dark input[type="datetime-local"] {
   color-scheme: dark;
 }
 
-input[type="date"]::-webkit-calendar-picker-indicator {
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
-  opacity: 0.75;
+  opacity: 0.85;
   padding: 4px;
-  border-radius: 8px;
-  transition: opacity 0.15s ease;
+  border-radius: 6px;
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
-input[type="date"]::-webkit-calendar-picker-indicator:hover {
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
   opacity: 1;
+  transform: scale(1.1);
 }
 
 /* Custom Sleek FinTech Scrollbars */

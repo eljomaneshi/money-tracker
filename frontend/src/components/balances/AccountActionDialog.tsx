@@ -244,55 +244,89 @@ export function AccountActionDialog({
             </div>
           )}
 
-          <Input
-            label={actionType === "TRANSFER" ? "Amount Sent" : "Amount"}
-            type="number"
-            min="0"
-            step="0.01"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="100.00"
-            required
-          />
+          <div className={actionType === "TRANSFER" && !isCrossCurrencyTransfer ? "sm:col-span-2" : "sm:col-span-2"}>
+            <Input
+              label={actionType === "TRANSFER" ? "Amount Sent" : "Amount"}
+              type="number"
+              min="0"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="100.00"
+              required
+            />
+          </div>
 
-          <div className="w-full">
-            <div className="mb-2 flex items-center justify-between">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Date &amp; Time
-              </label>
-              <button
-                type="button"
-                onClick={() => {
-                  setDate(getTodayDateStr());
-                  if (setTime) setTime(getCurrentTimeStr());
-                }}
-                className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors"
-                title="Reset to current date and time"
-              >
-                Now
-              </button>
-            </div>
-            <div className="grid grid-cols-5 gap-2">
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required
-                className={`${
-                  setTime ? "col-span-3" : "col-span-5"
-                } block w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-[#070b14] dark:text-slate-100 dark:focus:border-emerald-400 dark:focus:ring-emerald-500/20`}
-              />
-              {setTime && (
+          {setTime ? (
+            <>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  onClick={(e) => {
+                    try {
+                      e.currentTarget.showPicker?.();
+                    } catch {}
+                  }}
+                  required
+                  className="block w-full cursor-pointer rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-[#070b14] dark:text-slate-100 dark:focus:border-emerald-400 dark:focus:ring-emerald-500/20"
+                />
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Time
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDate(getTodayDateStr());
+                      if (setTime) setTime(getCurrentTimeStr());
+                    }}
+                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:text-emerald-300 dark:hover:bg-emerald-500/10 transition-colors"
+                    title="Reset to current date and time"
+                  >
+                    Now
+                  </button>
+                </div>
                 <input
                   type="time"
                   value={time || ""}
                   onChange={(e) => setTime(e.target.value)}
+                  onClick={(e) => {
+                    try {
+                      e.currentTarget.showPicker?.();
+                    } catch {}
+                  }}
                   required
-                  className="col-span-2 block w-full rounded-2xl border border-slate-200 bg-white px-2 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-[#070b14] dark:text-slate-100 dark:focus:border-emerald-400 dark:focus:ring-emerald-500/20"
+                  className="block w-full cursor-pointer rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-[#070b14] dark:text-slate-100 dark:focus:border-emerald-400 dark:focus:ring-emerald-500/20"
                 />
-              )}
+              </div>
+            </>
+          ) : (
+            <div className="sm:col-span-2">
+              <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Date
+              </label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                onClick={(e) => {
+                  try {
+                    e.currentTarget.showPicker?.();
+                  } catch {}
+                }}
+                required
+                className="block w-full cursor-pointer rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-[#070b14] dark:text-slate-100 dark:focus:border-emerald-400 dark:focus:ring-emerald-500/20"
+              />
             </div>
-          </div>
+          )}
 
           {isCrossCurrencyTransfer && (
             <div className="sm:col-span-2">
