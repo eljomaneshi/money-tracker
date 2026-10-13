@@ -3,6 +3,11 @@ import { Badge, type BadgeVariant } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import type { Currency } from "../../utils/formatMoney";
+import {
+  hasExplicitTime,
+  formatActivityDate,
+  formatActivityTime,
+} from "../../utils/dateTime";
 
 export type AccountActionType = "DEPOSIT" | "WITHDRAWAL" | "TRANSFER_OUT" | "TRANSFER_IN";
 
@@ -20,6 +25,7 @@ export interface ExpenseItem {
   description?: string | null;
   accountId?: number | null;
   account?: InlineAccount | null;
+  createdAt?: string;
 }
 
 export interface AccountActionItem {
@@ -30,6 +36,7 @@ export interface AccountActionItem {
   amount: number;
   description?: string | null;
   date: string;
+  createdAt?: string;
   account?: InlineAccount | null;
   toAccount?: InlineAccount | null;
 }
@@ -94,7 +101,7 @@ export function ActivityLedgerTable({
                   <th className="py-3.5 pr-4 text-right">Amount</th>
                   <th className="py-3.5 px-4 text-center">Type</th>
                   <th className="py-3.5 px-4">Account</th>
-                  <th className="py-3.5 px-4">Date</th>
+                  <th className="py-3.5 px-4">Date &amp; Time</th>
                   <th className="py-3.5 pl-4 pr-6 text-right">Actions</th>
                 </tr>
               </thead>
@@ -152,7 +159,16 @@ export function ActivityLedgerTable({
 
                         {/* Date */}
                         <td className="py-4 px-4 font-mono text-xs text-slate-500 dark:text-slate-400">
-                          {new Date(exp.date).toLocaleDateString()}
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">
+                              {formatActivityDate(exp.date)}
+                            </span>
+                            {hasExplicitTime(exp.date) && (
+                              <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500">
+                                {formatActivityTime(exp.date)}
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Actions */}
@@ -239,7 +255,16 @@ export function ActivityLedgerTable({
 
                       {/* Date */}
                       <td className="py-4 px-4 font-mono text-xs text-slate-500 dark:text-slate-400">
-                        {new Date(action.date).toLocaleDateString()}
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">
+                            {formatActivityDate(action.date)}
+                          </span>
+                          {hasExplicitTime(action.date) && (
+                            <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500">
+                              {formatActivityTime(action.date)}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Actions */}
@@ -300,7 +325,16 @@ export function ActivityLedgerTable({
                     <Landmark className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                     <span className="truncate">{getAccountName(exp.accountId, exp.account)}</span>
                   </div>
-                  <span className="font-mono shrink-0">{new Date(exp.date).toLocaleDateString()}</span>
+                  <div className="flex flex-col items-end font-mono shrink-0">
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      {formatActivityDate(exp.date)}
+                    </span>
+                    {hasExplicitTime(exp.date) && (
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                        {formatActivityTime(exp.date)}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <Button
@@ -372,7 +406,16 @@ export function ActivityLedgerTable({
                     </>
                   )}
                 </div>
-                <span className="font-mono shrink-0">{new Date(action.date).toLocaleDateString()}</span>
+                <div className="flex flex-col items-end font-mono shrink-0">
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {formatActivityDate(action.date)}
+                  </span>
+                  {hasExplicitTime(action.date) && (
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                      {formatActivityTime(action.date)}
+                    </span>
+                  )}
+                </div>
               </div>
             </Card>
           );

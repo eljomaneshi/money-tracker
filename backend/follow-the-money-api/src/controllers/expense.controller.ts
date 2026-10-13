@@ -2,6 +2,7 @@ import { Response } from "express";
 import prisma from "../prisma";
 import { AuthRequest } from "../middleware/auth";
 import type { Account } from "@prisma/client";
+import { parseTransactionDate } from "../utils/dateHelper";
 
 export async function getExpenses(req: AuthRequest, res: Response) {
     if (!req.user) return res.status(401).json({ message: "Unauthorized" });
@@ -13,7 +14,7 @@ export async function getExpenses(req: AuthRequest, res: Response) {
                 select: { id: true, name: true, baseCurrency: true },
             },
         },
-        orderBy: { date: "desc" },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "desc" }],
     });
 
     return res.json({ expenses });
@@ -72,7 +73,7 @@ export async function createExpense(req: AuthRequest, res: Response) {
                 data: {
                     userId: req.user!.userId,
                     amount: numericAmount,
-                    date: new Date(date),
+                    date: parseTransactionDate(date),
                     category,
                     description: description || null,
                     accountId: linkedAccountId,
@@ -250,7 +251,7 @@ export async function updateExpense(req: AuthRequest, res: Response) {
                 where: { id },
                 data: {
                     amount: parsedAmount,
-                    date: new Date(date),
+                    date: parseTransactionDate(date),
                     category,
                     description: description || null,
                     accountId: parsedAccountId,

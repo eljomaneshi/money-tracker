@@ -17,6 +17,12 @@ import {
 } from "../components/activity/ActivityLedgerTable";
 import { EditExpenseDialog } from "../components/activity/EditExpenseDialog";
 import { Button, Card, EmptyState, Input, Select, Skeleton } from "../components/ui";
+import {
+  getTodayDateStr,
+  getCurrentTimeStr,
+  constructIsoDateTime,
+  formatActivityDateTime,
+} from "../utils/dateTime";
 
 type Account = {
   id: number;
@@ -54,7 +60,8 @@ export default function Expenses() {
 
   // New expense form state
   const [amount, setAmount] = useState("");
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(getTodayDateStr());
+  const [time, setTime] = useState(getCurrentTimeStr());
   const [category, setCategory] = useState("Food");
   const [description, setDescription] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState<number | "">("");
@@ -178,9 +185,17 @@ export default function Expenses() {
   const activityItems = useMemo<ActivityItem[]>(() => {
     const expenseItems: ActivityItem[] = expenses.map((expense) => ({ itemType: "EXPENSE", data: expense }));
     const actionItems: ActivityItem[] = accountActions.map((action) => ({ itemType: "ACCOUNT_ACTION", data: action }));
-    return [...expenseItems, ...actionItems].sort(
-      (a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime()
-    );
+    return [...expenseItems, ...actionItems].sort((a, b) => {
+      const timeB = new Date(b.data.date).getTime();
+      const timeA = new Date(a.data.date).getTime();
+      if (timeB !== timeA) return timeB - timeA;
+
+      const createdB = b.data.createdAt ? new Date(b.data.createdAt).getTime() : 0;
+      const createdA = a.data.createdAt ? new Date(a.data.createdAt).getTime() : 0;
+      if (createdB !== createdA) return createdB - createdA;
+
+      return (b.data.id ?? 0) - (a.data.id ?? 0);
+    });
   }, [expenses, accountActions]);
 
   const dateRange = useMemo(() => {
@@ -415,7 +430,7 @@ export default function Expenses() {
             formatExpenseAmount(exp),
             exp.category === "Subscriptions" ? "Subscription" : "Expense",
             acc ? acc.name + " (" + acc.baseCurrency + ")" : "-",
-            new Date(exp.date).toLocaleDateString(),
+            formatActivityDateTime(exp.date),
           ];
         }
         const action = item.data;
@@ -433,7 +448,7 @@ export default function Expenses() {
           formatMoney(action.amount, currency as Currency, moneyPosition(currency as Currency)),
           getActionLabel(action.type),
           accountDisplay,
-          new Date(action.date).toLocaleDateString(),
+          formatActivityDateTime(action.date),
         ];
       });
 
@@ -441,7 +456,7 @@ export default function Expenses() {
 
       autoTable(doc, {
         startY: finalY + 10,
-        head: [["Description", "Amount", "Type", "Account", "Date"]],
+        head: [["Description", "Amount", "Type", "Account", "Date / Time"]],
         body: tableBody,
         styles: { fontSize: 8, cellPadding: 3 },
         headStyles: { fillColor: [59, 130, 246], fontStyle: "bold" },
@@ -450,7 +465,7 @@ export default function Expenses() {
           1: { halign: "right", cellWidth: 28 },
           2: { halign: "left", cellWidth: 28 },
           3: { halign: "left" },
-          4: { halign: "right", cellWidth: 22 },
+          4: { halign: "right", cellWidth: 28 },
         },
         alternateRowStyles: { fillColor: [245, 247, 255] },
         margin: { left: 14, right: 14 },
@@ -505,16 +520,18 @@ export default function Expenses() {
 
     try {
       setSubmitting(true);
+      const isoDateTime = constructIsoDateTime(date, time);
       await api.post("/expenses", {
         amount: numericAmount,
-        date,
+        date: isoDateTime,
         category,
         description: description.trim() || undefined,
         accountId: selectedAccountId,
       });
 
       setAmount("");
-      setDate("");
+      setDate(getTodayDateStr());
+      setTime(getCurrentTimeStr());
       setCategory("Food");
       setDescription("");
       setSelectedAccountId("");
@@ -633,16 +650,38 @@ export default function Expenses() {
           />
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Date
-            </label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-[#070b14] dark:text-slate-100"
-            />
+            <div className="mb-2 flex items-center justify-between">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Date &amp; Time
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setDate(getTodayDateStr());
+                  setTime(getCurrentTimeStr());
+                }}
+                className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors"
+                title="Reset to current date and time"
+              >
+                Now
+              </button>
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+                className="col-span-3 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-[#070b14] dark:text-slate-100"
+              />
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                required
+                className="col-span-2 w-full rounded-2xl border border-slate-200 bg-white px-2 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-[#070b14] dark:text-slate-100"
+              />
+            </div>
           </div>
 
           <Select

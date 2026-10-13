@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import crypto from "crypto";
 import prisma from "../prisma";
 import { AuthRequest } from "../middleware/auth";
+import { parseTransactionDate } from "../utils/dateHelper";
 
 export interface ApplePayCardMapping {
   cardName: string;
@@ -130,13 +131,7 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
       : autoDetectCategory(finalDescription);
 
   // Parse transaction date
-  let transactionDate = new Date();
-  if (date) {
-    const parsedDate = new Date(date);
-    if (!Number.isNaN(parsedDate.getTime())) {
-      transactionDate = parsedDate;
-    }
-  }
+  let transactionDate = date ? parseTransactionDate(date) : new Date();
 
   // Find user's active accounts
   const accounts = await prisma.account.findMany({

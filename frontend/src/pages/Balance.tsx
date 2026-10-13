@@ -23,6 +23,11 @@ import {
   AccountActionDialog,
   type ActionType,
 } from "../components/balances/AccountActionDialog";
+import {
+  getTodayDateStr,
+  getCurrentTimeStr,
+  constructIsoDateTime,
+} from "../utils/dateTime";
 import { EditAccountDialog } from "../components/balances/EditAccountDialog";
 import { ViewSwitcher, type ViewMode } from "../components/balances/ViewSwitcher";
 import { Button, Card, Input, Select, Skeleton, Badge } from "../components/ui";
@@ -77,6 +82,7 @@ export default function Balance() {
   const [actionAmount, setActionAmount] = useState("");
   const [targetAmount, setTargetAmount] = useState("");
   const [actionDate, setActionDate] = useState("");
+  const [actionTime, setActionTime] = useState("");
   const [actionDescription, setActionDescription] = useState("");
   const [fromAccountId, setFromAccountId] = useState<number | "">("");
   const [toAccountId, setToAccountId] = useState<number | "">("");
@@ -280,7 +286,8 @@ export default function Balance() {
     setActionType(nextType);
     setActionAmount("");
     setTargetAmount("");
-    setActionDate(new Date().toISOString().slice(0, 10));
+    setActionDate(getTodayDateStr());
+    setActionTime(getCurrentTimeStr());
     setActionDescription("");
     setFromAccountId(accounts.length > 0 ? accounts[0].id : "");
     setToAccountId(accounts.length > 1 ? accounts[1].id : "");
@@ -293,6 +300,7 @@ export default function Balance() {
     setActionAmount("");
     setTargetAmount("");
     setActionDate("");
+    setActionTime("");
     setActionDescription("");
     setFromAccountId("");
     setToAccountId("");
@@ -362,19 +370,20 @@ export default function Balance() {
 
     try {
       setActionSubmitting(true);
+      const finalActionDate = constructIsoDateTime(actionDate, actionTime);
 
       if (actionType === "DEPOSIT") {
         await api.post("/account-actions/deposit", {
           accountId: fromAccountId,
           amount: Number(actionAmount),
-          date: actionDate,
+          date: finalActionDate,
           description: actionDescription || undefined,
         });
       } else if (actionType === "WITHDRAWAL") {
         await api.post("/account-actions/withdraw", {
           accountId: fromAccountId,
           amount: Number(actionAmount),
-          date: actionDate,
+          date: finalActionDate,
           description: actionDescription || undefined,
         });
       } else {
@@ -383,7 +392,7 @@ export default function Balance() {
           toAccountId,
           amount: Number(actionAmount),
           targetAmount: isCrossCurrency ? Number(targetAmount) : Number(actionAmount),
-          date: actionDate,
+          date: finalActionDate,
           description: actionDescription || undefined,
         });
       }
@@ -819,6 +828,8 @@ export default function Balance() {
         setTargetAmount={setTargetAmount}
         date={actionDate}
         setDate={setActionDate}
+        time={actionTime}
+        setTime={setActionTime}
         description={actionDescription}
         setDescription={setActionDescription}
         fromAccountId={fromAccountId}

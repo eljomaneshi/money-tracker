@@ -2,6 +2,12 @@ import React, { useEffect, useState } from "react";
 import { Pencil, Save, X } from "lucide-react";
 import { Button, Dialog, Input, Select } from "../ui";
 import type { AccountOption } from "./ExpenseFilters";
+import {
+  parseDateAndTimeToInputs,
+  constructIsoDateTime,
+  getTodayDateStr,
+  getCurrentTimeStr,
+} from "../../utils/dateTime";
 
 export interface ExpenseRecord {
   id: number;
@@ -28,12 +34,6 @@ interface EditExpenseDialogProps {
   error?: string;
 }
 
-const formatDateForInput = (value: string) => {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-};
-
 export function EditExpenseDialog({
   isOpen,
   onClose,
@@ -45,6 +45,7 @@ export function EditExpenseDialog({
 }: EditExpenseDialogProps) {
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
   const [category, setCategory] = useState("Food");
   const [description, setDescription] = useState("");
   const [accountId, setAccountId] = useState<number | "">("");
@@ -52,8 +53,11 @@ export function EditExpenseDialog({
 
   useEffect(() => {
     if (expense) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAmount(String(expense.amount));
-      setDate(formatDateForInput(expense.date));
+      const parsed = parseDateAndTimeToInputs(expense.date);
+      setDate(parsed.date);
+      setTime(parsed.time);
       setCategory(expense.category || "Food");
       setDescription(expense.description || "");
       setAccountId(expense.accountId ?? "");
@@ -106,9 +110,11 @@ export function EditExpenseDialog({
       return;
     }
 
+    const isoDate = constructIsoDateTime(date, time);
+
     await onSave({
       amount: numAmount,
-      date,
+      date: isoDate,
       category,
       description: description.trim() || undefined,
       accountId: Number(accountId),
@@ -156,16 +162,38 @@ export function EditExpenseDialog({
           />
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Date
-            </label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-[#070b14] dark:text-slate-100"
-            />
+            <div className="mb-2 flex items-center justify-between">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Date &amp; Time
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setDate(getTodayDateStr());
+                  setTime(getCurrentTimeStr());
+                }}
+                className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors"
+                title="Reset to current date and time"
+              >
+                Now
+              </button>
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+                className="col-span-3 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-[#070b14] dark:text-slate-100"
+              />
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                required
+                className="col-span-2 w-full rounded-2xl border border-slate-200 bg-white px-2 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-[#070b14] dark:text-slate-100"
+              />
+            </div>
           </div>
         </div>
 

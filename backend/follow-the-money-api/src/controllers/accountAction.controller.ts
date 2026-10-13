@@ -1,6 +1,7 @@
 import { Response } from "express";
 import prisma from "../prisma";
 import { AuthRequest } from "../middleware/auth";
+import { parseTransactionDate } from "../utils/dateHelper";
 
 export async function getAccountActions(req: AuthRequest, res: Response) {
     if (!req.user) return res.status(401).json({ message: "Unauthorized" });
@@ -16,7 +17,7 @@ export async function getAccountActions(req: AuthRequest, res: Response) {
                     select: { id: true, name: true, baseCurrency: true },
                 },
             },
-            orderBy: { date: "desc" },
+            orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "desc" }],
         });
 
         return res.json({ actions });
@@ -76,7 +77,7 @@ export async function depositToAccount(req: AuthRequest, res: Response) {
                     type: "DEPOSIT",
                     amount: parsedAmount,
                     description: description || null,
-                    date: new Date(date),
+                    date: parseTransactionDate(date),
                 },
             });
 
@@ -148,7 +149,7 @@ export async function withdrawFromAccount(req: AuthRequest, res: Response) {
                     type: "WITHDRAWAL",
                     amount: parsedAmount,
                     description: description || null,
-                    date: new Date(date),
+                    date: parseTransactionDate(date),
                 },
             });
 
@@ -242,6 +243,8 @@ export async function transferBetweenAccounts(req: AuthRequest, res: Response) {
                 data: { balance: { increment: safeTargetAmount } },
             });
 
+            const transferDate = parseTransactionDate(date);
+
             const transferOut = await tx.accountAction.create({
                 data: {
                     userId: req.user!.userId,
@@ -252,7 +255,7 @@ export async function transferBetweenAccounts(req: AuthRequest, res: Response) {
                     targetAmount: safeTargetAmount,
                     exchangeRate,
                     description: description || null,
-                    date: new Date(date),
+                    date: transferDate,
                 },
             });
 
@@ -266,7 +269,7 @@ export async function transferBetweenAccounts(req: AuthRequest, res: Response) {
                     targetAmount: parsedAmount,
                     exchangeRate,
                     description: description || null,
-                    date: new Date(date),
+                    date: transferDate,
                 },
             });
 

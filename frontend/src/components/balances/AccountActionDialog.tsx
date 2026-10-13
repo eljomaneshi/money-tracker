@@ -5,6 +5,7 @@ import { Input } from "../ui/Input";
 import { Select } from "../ui/Select";
 import { Button } from "../ui/Button";
 import type { Account } from "./AccountCard";
+import { getTodayDateStr, getCurrentTimeStr } from "../../utils/dateTime";
 
 export type ActionType = "DEPOSIT" | "WITHDRAWAL" | "TRANSFER";
 
@@ -19,6 +20,8 @@ export interface AccountActionDialogProps {
   setTargetAmount: (val: string) => void;
   date: string;
   setDate: (val: string) => void;
+  time?: string;
+  setTime?: (val: string) => void;
   description: string;
   setDescription: (val: string) => void;
   fromAccountId: number | "";
@@ -41,6 +44,8 @@ export function AccountActionDialog({
   setTargetAmount,
   date,
   setDate,
+  time,
+  setTime,
   description,
   setDescription,
   fromAccountId,
@@ -251,16 +256,42 @@ export function AccountActionDialog({
           />
 
           <div className="w-full">
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Date
-            </label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-              className="block w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-[#070b14] dark:text-slate-100 dark:focus:border-emerald-400 dark:focus:ring-emerald-500/20"
-            />
+            <div className="mb-2 flex items-center justify-between">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Date &amp; Time
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setDate(getTodayDateStr());
+                  if (setTime) setTime(getCurrentTimeStr());
+                }}
+                className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors"
+                title="Reset to current date and time"
+              >
+                Now
+              </button>
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+                className={`${
+                  setTime ? "col-span-3" : "col-span-5"
+                } block w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-[#070b14] dark:text-slate-100 dark:focus:border-emerald-400 dark:focus:ring-emerald-500/20`}
+              />
+              {setTime && (
+                <input
+                  type="time"
+                  value={time || ""}
+                  onChange={(e) => setTime(e.target.value)}
+                  required
+                  className="col-span-2 block w-full rounded-2xl border border-slate-200 bg-white px-2 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-[#070b14] dark:text-slate-100 dark:focus:border-emerald-400 dark:focus:ring-emerald-500/20"
+                />
+              )}
+            </div>
           </div>
 
           {isCrossCurrencyTransfer && (
