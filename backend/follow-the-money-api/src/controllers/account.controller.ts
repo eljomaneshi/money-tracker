@@ -22,64 +22,16 @@ export async function getAccounts(req: AuthRequest, res: Response) {
     }
 }
 
-interface ExchangeRates {
-    EUR: number;
-    ALL: number;
-    GBP: number;
-    USD: number;
-}
-
-let cachedRates: { rates: ExchangeRates; fetchedAt: number } | null = null;
-const RATES_CACHE_TTL = 1000 * 60 * 60; // 1 hour in ms
+import { fetchExchangeRates } from "../utils/formatMoney";
 
 export async function getExchangeRates(req: AuthRequest, res: Response) {
     if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
-    const now = Date.now();
-    if (cachedRates && now - cachedRates.fetchedAt < RATES_CACHE_TTL) {
-        return res.json({ rates: cachedRates.rates });
-    }
-
     try {
-        const response = await fetch("https://open.er-api.com/v6/latest/EUR", {
-            signal: AbortSignal.timeout(5000),
-        });
-
-        if (!response.ok) {
-            throw new Error("Failed to fetch exchange rates");
-        }
-
-        const data = await response.json();
-
-        const allRate = Number(data?.rates?.ALL);
-        const gbpRate = Number(data?.rates?.GBP);
-        const usdRate = Number(data?.rates?.USD);
-
-        if (
-            !Number.isFinite(allRate) || allRate <= 0 ||
-            !Number.isFinite(gbpRate) || gbpRate <= 0 ||
-            !Number.isFinite(usdRate) || usdRate <= 0
-        ) {
-            throw new Error("Invalid exchange rates received");
-        }
-
-        const rates: ExchangeRates = {
-            EUR: 1,
-            ALL: allRate,
-            GBP: gbpRate,
-            USD: usdRate,
-        };
-
-        cachedRates = { rates, fetchedAt: now };
-
+        const rates = await fetchExchangeRates();
         return res.json({ rates });
     } catch (err) {
         console.error("Exchange rates error:", err);
-
-        if (cachedRates) {
-            return res.json({ rates: cachedRates.rates });
-        }
-
         return res.json({
             rates: {
                 EUR: 1,

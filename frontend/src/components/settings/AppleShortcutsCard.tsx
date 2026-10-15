@@ -687,7 +687,7 @@ export function AppleShortcutsCard() {
                   </h4>
                 </div>
                 <p className="mt-2 text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                  Select <strong>Transaction</strong>. Set Card to <strong>Any Card</strong> (or select specific cards). Choose <strong>Run Immediately</strong> and turn off <em>Notify When Run</em>.
+                  Select <strong>Transaction</strong>. Set Card to <strong>Any Card</strong> (or pick specific cards). Choose <strong>Run Immediately</strong> and keep <strong>Notify When Run: ON</strong> to see immediate confirmation banners.
                 </p>
               </div>
 
@@ -736,12 +736,16 @@ export function AppleShortcutsCard() {
                     <pre className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-3 font-mono text-[11px] text-slate-800 dark:border-white/10 dark:bg-[#070b14] dark:text-slate-200">
 {`{
   "amount": Shortcut Input (Amount),
+  "currency": Shortcut Input (Currency Code),
   "merchant": Shortcut Input (Merchant),
-  "cardName": Shortcut Input (Card),
+  "cardName": Shortcut Input (Card or Pass),
   "date": Shortcut Input (Date)
 }`}
                     </pre>
                   </div>
+                  <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                    💡 <strong>Pro-Tip:</strong> In Shortcuts, tap <code>Shortcut Input</code> on each line and choose its corresponding property: <strong>Amount</strong>, <strong>Currency Code</strong>, <strong>Merchant</strong>, <strong>Card or Pass</strong>, and <strong>Date</strong>. If you pay in Lek (ALL) with a GBP card (or vice versa), Money Tracker converts it automatically using live bank rates!
+                  </p>
                 </div>
               </div>
             </div>
