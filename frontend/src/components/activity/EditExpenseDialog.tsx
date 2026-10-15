@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Pencil, Save, X } from "lucide-react";
+import { Pencil, Save, Trash2, X } from "lucide-react";
 import { Button, Dialog, Input, Select } from "../ui";
 import type { AccountOption } from "./ExpenseFilters";
 import {
@@ -30,7 +30,9 @@ interface EditExpenseDialogProps {
     description?: string;
     accountId: number;
   }) => Promise<void>;
+  onDelete?: () => Promise<void>;
   isSaving: boolean;
+  isDeleting?: boolean;
   error?: string;
 }
 
@@ -40,7 +42,9 @@ export function EditExpenseDialog({
   expense,
   accounts,
   onSave,
+  onDelete,
   isSaving,
+  isDeleting = false,
   error: externalError,
 }: EditExpenseDialogProps) {
   const [amount, setAmount] = useState("");
@@ -297,28 +301,47 @@ export function EditExpenseDialog({
           placeholder="Groceries, Uber, etc."
         />
 
-        <div className="mt-6 flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-white/5">
-          <Button
-            type="button"
-            variant="outline"
-            size="md"
-            onClick={onClose}
-            disabled={isSaving}
-            leftIcon={<X className="h-4 w-4" />}
-          >
-            Cancel
-          </Button>
+        <div className="mt-6 flex items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-white/5">
+          {onDelete ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-900/50 dark:text-rose-400 dark:hover:bg-rose-950/30"
+              onClick={onDelete}
+              disabled={isSaving || isDeleting}
+              isLoading={isDeleting}
+              leftIcon={<Trash2 className="h-4 w-4" />}
+            >
+              Delete
+            </Button>
+          ) : (
+            <div />
+          )}
 
-          <Button
-            type="submit"
-            variant="primary"
-            size="md"
-            disabled={Boolean(isInsufficient)}
-            isLoading={isSaving}
-            leftIcon={<Save className="h-4 w-4" />}
-          >
-            Save changes
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              onClick={onClose}
+              disabled={isSaving || isDeleting}
+              leftIcon={<X className="h-4 w-4" />}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              disabled={Boolean(isInsufficient) || isDeleting}
+              isLoading={isSaving}
+              leftIcon={<Save className="h-4 w-4" />}
+            >
+              Save changes
+            </Button>
+          </div>
         </div>
       </form>
     </Dialog>

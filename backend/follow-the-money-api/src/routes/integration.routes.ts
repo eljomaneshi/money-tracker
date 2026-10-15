@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
 import {
   quickExpenseWebhook,
+  cleanupTestTransactions,
   getApiKey,
   generateApiKey,
   revokeApiKey,
@@ -13,6 +14,7 @@ const router = Router();
 
 // Public webhook endpoint authenticated via API Key (X-API-Key or Bearer token)
 router.post("/quick-expense", quickExpenseWebhook);
+router.post("/cleanup-test-transactions", cleanupTestTransactions);
 
 // User-facing API key & multi-card settings management (authenticated via web session JWT)
 router.get("/api-key", requireAuth, getApiKey);

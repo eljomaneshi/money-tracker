@@ -649,3 +649,69 @@ export async function updateIntegrationSettings(req: AuthRequest, res: Response)
     return res.status(500).json({ error: "Failed to save integration settings" });
   }
 }
+
+// Clean up test/accidental transactions and restore account balances
+export async function cleanupTestTransactions(req: Request, res: Response) {
+  try {
+    const apiKey = extractApiKey(req);
+    if (!apiKey) return res.status(401).json({ error: "Missing API key" });
+    const user = await prisma.user.findFirst({ where: { apiKey } });
+    if (!user) return res.status(401).json({ error: "Invalid API key" });
+
+    const specificIds: number[] = Array.isArray(req.body.ids)
+      ? req.body.ids.map(Number).filter((n: number) => !Number.isNaN(n))
+      : [];
+
+    let whereClause: any = {
+      userId: user.id,
+    };
+
+    if (specificIds.length > 0) {
+      whereClause.id = { in: specificIds };
+    } else {
+      whereClause.OR = [
+        { description: { contains: "Spar (€ 0.01)" } },
+        { description: { contains: "Sainsbury's" } },
+        { description: { contains: "SPAR (ALL 3,500.00)" } },
+        { description: "Test" },
+      ];
+    }
+
+    const testExpenses = await prisma.expense.findMany({
+      where: whereClause,
+      include: {
+        account: true,
+      },
+    });
+
+    const refunded: any[] = [];
+    for (const exp of testExpenses) {
+      await prisma.$transaction(async (tx) => {
+        if (exp.accountId) {
+          await tx.account.update({
+            where: { id: exp.accountId },
+            data: { balance: { increment: exp.amount } },
+          });
+        }
+        await tx.expense.delete({ where: { id: exp.id } });
+      });
+      refunded.push({
+        id: exp.id,
+        description: exp.description,
+        amount: exp.amount,
+        accountName: exp.account?.name,
+        currency: exp.account?.baseCurrency,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: `Cleaned up ${refunded.length} test transactions and refunded account balances.`,
+      refunded,
+    });
+  } catch (err: any) {
+    console.error("Cleanup error:", err);
+    return res.status(500).json({ error: err.message || "Failed to cleanup transactions" });
+  }
+}
+

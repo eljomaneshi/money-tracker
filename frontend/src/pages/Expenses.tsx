@@ -572,6 +572,32 @@ export default function Expenses() {
     }
   };
 
+  const handleEditDelete = async () => {
+    if (!editingExpense) return;
+    if (
+      !window.confirm(
+        `Are you sure you want to delete this expense (${editingExpense.description || "Expense"})? The amount will be refunded back to your account balance.`
+      )
+    ) {
+      return;
+    }
+    try {
+      setEditSubmitting(true);
+      setEditError("");
+      await api.delete(`/expenses/${editingExpense.id}`);
+      setEditingExpense(null);
+      await fetchData();
+    } catch (err: any) {
+      setEditError(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to delete expense"
+      );
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
   const accountOptions: AccountOption[] = useMemo(() => {
     return accounts.map((a) => ({
       id: a.id,
@@ -951,6 +977,7 @@ export default function Expenses() {
         expense={editingExpense}
         accounts={accountOptions}
         onSave={handleEditSave}
+        onDelete={handleEditDelete}
         isSaving={editSubmitting}
         error={editError}
       />
