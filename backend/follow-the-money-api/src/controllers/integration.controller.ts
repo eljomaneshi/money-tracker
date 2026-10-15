@@ -495,8 +495,8 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
     }
 
     // Duplicate Protection (Idempotency)
-    // If an identical transaction was recorded within the last 15 minutes, skip to prevent double-charging
-    const recentThreshold = new Date(Date.now() - 15 * 60 * 1000);
+    // If an identical transaction was recorded within the last 30 minutes, skip to prevent double-charging
+    const recentThreshold = new Date(Date.now() - 30 * 60 * 1000);
     const existingDuplicate = await prisma.expense.findFirst({
       where: {
         userId: user.id,
