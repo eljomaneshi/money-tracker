@@ -191,6 +191,20 @@ export function parseTransactionFromText(rawText: string | string[] | any): Pars
     result.cardName = "Yuh Debit Card";
   } else if (lower.includes("jet bank") || lower.includes("jetbank")) {
     result.cardName = result.currency === "ALL" ? "Jet Bank ALL" : "Jet Bank Eur";
+  } else if (lower.includes("binance")) {
+    result.cardName = "Binance";
+  } else if (lower.includes("revolut")) {
+    result.cardName = "Revolut";
+  } else if (lower.includes("raiffeisen")) {
+    result.cardName = "Raiffeisen";
+  } else if (lower.includes("bkt")) {
+    result.cardName = "BKT";
+  } else if (lower.includes("credins")) {
+    result.cardName = "Credins";
+  } else if (lower.includes("intesa")) {
+    result.cardName = "Intesa";
+  } else if (lower.includes("otp")) {
+    result.cardName = "OTP";
   }
 
   // 4. Extract Merchant
@@ -477,6 +491,38 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
     if (matchedAccount.balance < finalDeductionAmount) {
       return res.status(400).json({
         error: `Insufficient balance in ${matchedAccount.name}. Available balance is ${matchedAccount.balance.toFixed(2)} ${matchedAccount.baseCurrency}, but transaction requires ${finalDeductionAmount.toFixed(2)} ${matchedAccount.baseCurrency}${currencyNote}. Transaction rejected.`,
+      });
+    }
+
+    // Duplicate Protection (Idempotency)
+    // If an identical transaction was recorded within the last 15 minutes, skip to prevent double-charging
+    const recentThreshold = new Date(Date.now() - 15 * 60 * 1000);
+    const existingDuplicate = await prisma.expense.findFirst({
+      where: {
+        userId: user.id,
+        accountId: matchedAccount.id,
+        amount: {
+          gte: finalDeductionAmount - 0.01,
+          lte: finalDeductionAmount + 0.01,
+        },
+        description: finalDescription,
+        createdAt: { gte: recentThreshold },
+      },
+    });
+
+    if (existingDuplicate) {
+      const minutesAgo = Math.max(1, Math.round((Date.now() - existingDuplicate.createdAt.getTime()) / 60000));
+      return res.status(200).json({
+        success: true,
+        duplicate: true,
+        message: `Already recorded: "${finalDescription}" (${formatMoney(finalDeductionAmount, matchedAccount.baseCurrency as Currency)}) was already logged ${minutesAgo}m ago. Skipped duplicate.`,
+        expense: existingDuplicate,
+        account: {
+          id: matchedAccount.id,
+          name: matchedAccount.name,
+          remainingBalance: matchedAccount.balance,
+          currency: matchedAccount.baseCurrency,
+        },
       });
     }
 
