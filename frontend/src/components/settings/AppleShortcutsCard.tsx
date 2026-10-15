@@ -804,14 +804,16 @@ export function AppleShortcutsCard() {
                     2
                   </span>
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                    Add 4 Actions
+                    Add 3 Actions (100% Silent)
                   </h4>
                 </div>
                 <div className="mt-2 text-[11px] text-slate-600 dark:text-slate-400 space-y-1">
                   <p>1. <strong>Take Screenshot</strong></p>
                   <p>2. <strong>Extract Text from Image</strong> (Screenshot)</p>
                   <p>3. <strong>Get Contents of URL</strong> (POST to Webhook)</p>
-                  <p>4. <strong>Delete Photos</strong> (Screenshot)</p>
+                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400 pt-0.5">
+                    ✓ No popups: In-memory only (never saves to Photos library).
+                  </p>
                 </div>
               </div>
 

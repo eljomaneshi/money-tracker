@@ -120,27 +120,45 @@ export interface ParsedNotification {
   cardDigits?: string;
 }
 
-export function parseTransactionFromText(rawText: string): ParsedNotification {
-  if (!rawText || typeof rawText !== "string") return {};
+export function parseTransactionFromText(rawText: string | string[] | any): ParsedNotification {
+  if (!rawText) return {};
 
-  const clean = rawText.replace(/\r?\n+/g, " ").trim();
-  const lower = clean.toLowerCase();
+  let fullText = "";
+  if (Array.isArray(rawText)) {
+    fullText = rawText.map((t) => String(t || "").trim()).filter(Boolean).join(" ");
+  } else if (rawText && typeof rawText === "object") {
+    fullText = Object.values(rawText).map((t) => String(t || "").trim()).filter(Boolean).join(" ");
+  } else {
+    fullText = String(rawText).replace(/\r?\n+/g, " ").trim();
+  }
+
+  if (!fullText) return {};
+
+  const lower = fullText.toLowerCase();
   const result: ParsedNotification = {};
 
-  // 1. Detect Currency
-  if (/(\bALL\b|\bLEK\b|\bLEKE\b)/i.test(clean)) {
+  // Find the specific sentence or notification fragment that mentions payment / amount
+  // If there are multiple notifications (e.g. "Sent a video", "You paid 0.01 EUR..."),
+  // isolate the segment around payment verbs
+  const paymentSegmentRegex = /(?:you paid|paid|spent|pages[eë]|blerje|transaksion|payment|purchase)[\s\S]{5,150}?(?=\.(?!\d)|\n|$)/i;
+  const segmentMatch = fullText.match(paymentSegmentRegex);
+  const targetText = segmentMatch ? segmentMatch[0] : fullText;
+
+  // 1. Detect Currency (check targetText first, then fullText)
+  if (/(\bALL\b|\bLEK\b|\bLEKE\b)/i.test(targetText) || /(\bALL\b|\bLEK\b|\bLEKE\b)/i.test(fullText)) {
     result.currency = "ALL";
-  } else if (/(\bEUR\b|€)/i.test(clean)) {
+  } else if (/(\bEUR\b|€)/i.test(targetText) || /(\bEUR\b|€)/i.test(fullText)) {
     result.currency = "EUR";
-  } else if (/(\bGBP\b|£)/i.test(clean)) {
+  } else if (/(\bGBP\b|£)/i.test(targetText) || /(\bGBP\b|£)/i.test(fullText)) {
     result.currency = "GBP";
-  } else if (/(\bUSD\b|\$)/i.test(clean)) {
+  } else if (/(\bUSD\b|\$)/i.test(targetText) || /(\bUSD\b|\$)/i.test(fullText)) {
     result.currency = "USD";
   }
 
   // 2. Extract Amount
   const currWithNumRegex = /(?:([€$£]|ALL|EUR|GBP|USD|LEK)\s*([0-9]{1,3}(?:[,\s][0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?))|([0-9]{1,3}(?:[,\s][0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s*([€$£]|ALL|EUR|GBP|USD|LEK)/i;
-  const currMatch = clean.match(currWithNumRegex);
+  let currMatch = targetText.match(currWithNumRegex);
+  if (!currMatch) currMatch = fullText.match(currWithNumRegex);
 
   if (currMatch) {
     const rawNum = (currMatch[2] || currMatch[3] || "").replace(/[\s,]/g, "");
@@ -152,7 +170,7 @@ export function parseTransactionFromText(rawText: string): ParsedNotification {
 
   // Fallback number search if not found above
   if (!result.amount) {
-    const verbMatch = clean.match(/(?:paid|spent|vler[eë]|pages[eë]|blerje|amount|shum[aë]|euro|lek)\s*:?\s*([0-9]{1,3}(?:[,\s][0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i);
+    const verbMatch = fullText.match(/(?:paid|spent|vler[eë]|pages[eë]|blerje|amount|shum[aë]|euro|lek)\s*:?\s*([0-9]{1,3}(?:[,\s][0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i);
     if (verbMatch) {
       const parsed = parseFloat(verbMatch[1].replace(/[\s,]/g, ""));
       if (!Number.isNaN(parsed) && parsed > 0) {
@@ -162,7 +180,7 @@ export function parseTransactionFromText(rawText: string): ParsedNotification {
   }
 
   // 3. Card Digits or Bank Name
-  const digitsMatch = clean.match(/(?:\*|karten|kartes|card|ending|x+)\s*[*#\s]*([0-9]{4})\b/i);
+  const digitsMatch = fullText.match(/(?:\*|karten|kartes|card|ending|x+)\s*[*#\s]*([0-9]{4})\b/i);
   if (digitsMatch) {
     result.cardDigits = digitsMatch[1];
   }
@@ -177,13 +195,14 @@ export function parseTransactionFromText(rawText: string): ParsedNotification {
 
   // 4. Extract Merchant
   const triggerRegex = /(?:at|to|tek|te|tek dyqani|te tregtari|aprovuar tek|dyqani|merchant:?)\s+/i;
-  const matchTrigger = clean.match(triggerRegex);
+  const matchTrigger = targetText.match(triggerRegex) || fullText.match(triggerRegex);
+  const sourceTextForMerchant = segmentMatch ? targetText : fullText;
   if (matchTrigger && matchTrigger.index !== undefined) {
-    const after = clean.slice(matchTrigger.index + matchTrigger[0].length).trim();
+    const after = sourceTextForMerchant.slice(matchTrigger.index + matchTrigger[0].length).trim();
     const stopWords = /(?:\s+(?:with|me|nga|on|using|approved|successful|dhe|date|sukses\w*|\*|\b\d{4}\b)[\s\S]*$)/i;
     const merchantCandidate = after.replace(stopWords, "").trim();
     if (merchantCandidate && merchantCandidate.length >= 2 && merchantCandidate.length <= 40) {
-      if (!/^(the|a|an|me|te|tek|card|karten|kartes)$/i.test(merchantCandidate)) {
+      if (!/^(the|a|an|me|te|tek|card|karten|kartes|your)$/i.test(merchantCandidate)) {
         result.merchant = merchantCandidate;
       }
     }
@@ -211,11 +230,20 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
       return res.status(401).json({ error: "Invalid API key" });
     }
 
-    const rawInputText = req.body.text || req.body.rawText || req.body.notification || req.body.message;
+    const rawInputText = req.body.text ?? req.body.rawText ?? req.body.notification ?? req.body.message;
     let parsedFromText: ParsedNotification = {};
 
-    if (rawInputText && typeof rawInputText === "string" && rawInputText.trim()) {
-      parsedFromText = parseTransactionFromText(rawInputText);
+    let normalizedInputText = "";
+    if (Array.isArray(rawInputText)) {
+      normalizedInputText = rawInputText.map((t) => String(t || "").trim()).filter(Boolean).join(" ");
+    } else if (rawInputText && typeof rawInputText === "object") {
+      normalizedInputText = Object.values(rawInputText).map((t) => String(t || "").trim()).filter(Boolean).join(" ");
+    } else if (typeof rawInputText === "string") {
+      normalizedInputText = rawInputText.trim();
+    }
+
+    if (normalizedInputText) {
+      parsedFromText = parseTransactionFromText(normalizedInputText);
     }
 
     const { amount, currency, merchant, description, cardName, category, date } = req.body;
