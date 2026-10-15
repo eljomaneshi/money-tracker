@@ -80,7 +80,7 @@ export function AppleShortcutsCard() {
   } | null>(null);
 
   // Active instructions tabs
-  const [showGuide, setShowGuide] = useState(true);
+  const [showGuide, setShowGuide] = useState(false);
   const [showBackTapGuide, setShowBackTapGuide] = useState(false);
 
   // Webhook URLs
@@ -286,6 +286,8 @@ export function AppleShortcutsCard() {
       iconBg="bg-indigo-100 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300"
       title="Apple Pay & iOS Shortcuts Automation"
       description="Automatically record expenses in real-time whenever you pay with your iPhone or Apple Watch."
+      collapsible
+      defaultOpen={false}
       badge={
         <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200/80 bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 dark:border-indigo-800/60 dark:bg-indigo-950/40 dark:text-indigo-300">
           <Zap className="h-3 w-3" />

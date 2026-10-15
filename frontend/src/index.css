@@ -35,7 +35,11 @@
   box-sizing: border-box;
 }
 
-html,
+html {
+  min-height: 100%;
+  touch-action: manipulation;
+}
+
 body,
 #root {
   min-height: 100%;
@@ -48,6 +52,7 @@ body {
   color: #0f172a;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .dark body {
@@ -63,6 +68,15 @@ input,
 select,
 textarea {
   max-width: 100%;
+}
+
+/* Prevent iOS Safari 300ms tap delay & auto-zoom on mobile inputs */
+@media screen and (max-width: 768px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 input[type="date"],

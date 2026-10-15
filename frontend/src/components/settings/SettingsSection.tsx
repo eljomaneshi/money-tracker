@@ -1,4 +1,5 @@
-import type { ComponentType, ReactNode } from "react";
+import { useState, type ComponentType, type ReactNode } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 export interface SettingsSectionProps {
   icon: ComponentType<{ className?: string }>;
@@ -11,6 +12,8 @@ export interface SettingsSectionProps {
   children: ReactNode;
   className?: string;
   danger?: boolean;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
 }
 
 export function SettingsSection({
@@ -24,7 +27,11 @@ export function SettingsSection({
   children,
   className = "",
   danger = false,
+  collapsible = false,
+  defaultOpen = true,
 }: SettingsSectionProps) {
+  const [isOpen, setIsOpen] = useState(collapsible ? defaultOpen : true);
+
   return (
     <section
       className={`rounded-3xl border bg-white p-6 shadow-sm transition-all duration-200 dark:bg-[#0d1526] sm:p-8 ${
@@ -34,13 +41,17 @@ export function SettingsSection({
       } ${className}`}
     >
       {/* Header */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div
+        className={`flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between ${
+          isOpen ? "mb-6" : "mb-0"
+        }`}
+      >
         <div className="flex items-start gap-3.5">
           <div className={`rounded-2xl p-2.5 shrink-0 ${iconBg}`}>
             <Icon className="h-5 w-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2.5">
               <h2
                 className={`text-xl font-bold tracking-tight sm:text-2xl ${
                   danger
@@ -59,32 +70,47 @@ export function SettingsSection({
             )}
           </div>
         </div>
+
+        {collapsible && (
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+          >
+            {isOpen ? "Hide" : "Show"}
+            {isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          </button>
+        )}
       </div>
 
-      {/* Success Notification Alert */}
-      {successMessage && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300"
-        >
-          {successMessage}
-        </div>
-      )}
+      {isOpen && (
+        <>
+          {/* Success Notification Alert */}
+          {successMessage && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300"
+            >
+              {successMessage}
+            </div>
+          )}
 
-      {/* Error Notification Alert */}
-      {errorMessage && (
-        <div
-          role="alert"
-          aria-live="assertive"
-          className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
-        >
-          {errorMessage}
-        </div>
-      )}
+          {/* Error Notification Alert */}
+          {errorMessage && (
+            <div
+              role="alert"
+              aria-live="assertive"
+              className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+            >
+              {errorMessage}
+            </div>
+          )}
 
-      {/* Section Content */}
-      <div className="space-y-6">{children}</div>
+          {/* Section Content */}
+          <div className="space-y-6">{children}</div>
+        </>
+      )}
     </section>
   );
 }

@@ -74,7 +74,7 @@ export function Dialog({
       {/* Dialog card */}
       <div
         ref={dialogRef}
-        className={`relative w-full ${maxWidthStyles[maxWidth]} rounded-[28px] border border-slate-200 bg-white p-6 shadow-2xl transition-all duration-200 dark:border-white/10 dark:bg-[#0d1526] sm:p-8 z-10 max-h-[90vh] flex flex-col`}
+        className={`relative w-full ${maxWidthStyles[maxWidth]} rounded-[28px] border border-slate-200 bg-white p-5 shadow-2xl transition-all duration-200 dark:border-white/10 dark:bg-[#0d1526] sm:p-8 z-10 max-h-[90vh] flex flex-col`}
       >
         <div className="flex items-start justify-between gap-4">
           <div>
