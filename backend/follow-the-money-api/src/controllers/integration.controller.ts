@@ -112,6 +112,86 @@ function extractApiKey(req: Request): string | null {
   return null;
 }
 
+export interface ParsedNotification {
+  amount?: number;
+  currency?: Currency;
+  merchant?: string;
+  cardName?: string;
+  cardDigits?: string;
+}
+
+export function parseTransactionFromText(rawText: string): ParsedNotification {
+  if (!rawText || typeof rawText !== "string") return {};
+
+  const clean = rawText.replace(/\r?\n+/g, " ").trim();
+  const lower = clean.toLowerCase();
+  const result: ParsedNotification = {};
+
+  // 1. Detect Currency
+  if (/(\bALL\b|\bLEK\b|\bLEKE\b)/i.test(clean)) {
+    result.currency = "ALL";
+  } else if (/(\bEUR\b|€)/i.test(clean)) {
+    result.currency = "EUR";
+  } else if (/(\bGBP\b|£)/i.test(clean)) {
+    result.currency = "GBP";
+  } else if (/(\bUSD\b|\$)/i.test(clean)) {
+    result.currency = "USD";
+  }
+
+  // 2. Extract Amount
+  const currWithNumRegex = /(?:([€$£]|ALL|EUR|GBP|USD|LEK)\s*([0-9]{1,3}(?:[,\s][0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?))|([0-9]{1,3}(?:[,\s][0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s*([€$£]|ALL|EUR|GBP|USD|LEK)/i;
+  const currMatch = clean.match(currWithNumRegex);
+
+  if (currMatch) {
+    const rawNum = (currMatch[2] || currMatch[3] || "").replace(/[\s,]/g, "");
+    const parsed = parseFloat(rawNum);
+    if (!Number.isNaN(parsed) && parsed > 0) {
+      result.amount = parsed;
+    }
+  }
+
+  // Fallback number search if not found above
+  if (!result.amount) {
+    const verbMatch = clean.match(/(?:paid|spent|vler[eë]|pages[eë]|blerje|amount|shum[aë]|euro|lek)\s*:?\s*([0-9]{1,3}(?:[,\s][0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i);
+    if (verbMatch) {
+      const parsed = parseFloat(verbMatch[1].replace(/[\s,]/g, ""));
+      if (!Number.isNaN(parsed) && parsed > 0) {
+        result.amount = parsed;
+      }
+    }
+  }
+
+  // 3. Card Digits or Bank Name
+  const digitsMatch = clean.match(/(?:\*|karten|kartes|card|ending|x+)\s*[*#\s]*([0-9]{4})\b/i);
+  if (digitsMatch) {
+    result.cardDigits = digitsMatch[1];
+  }
+
+  if (lower.includes("monzo")) {
+    result.cardName = "Monzo Mastercard";
+  } else if (lower.includes("yuh")) {
+    result.cardName = "Yuh Debit Card";
+  } else if (lower.includes("jet bank") || lower.includes("jetbank")) {
+    result.cardName = result.currency === "ALL" ? "Jet Bank ALL" : "Jet Bank Eur";
+  }
+
+  // 4. Extract Merchant
+  const triggerRegex = /(?:at|to|tek|te|tek dyqani|te tregtari|aprovuar tek|dyqani|merchant:?)\s+/i;
+  const matchTrigger = clean.match(triggerRegex);
+  if (matchTrigger && matchTrigger.index !== undefined) {
+    const after = clean.slice(matchTrigger.index + matchTrigger[0].length).trim();
+    const stopWords = /(?:\s+(?:with|me|nga|on|using|approved|successful|dhe|date|sukses\w*|\*|\b\d{4}\b)[\s\S]*$)/i;
+    const merchantCandidate = after.replace(stopWords, "").trim();
+    if (merchantCandidate && merchantCandidate.length >= 2 && merchantCandidate.length <= 40) {
+      if (!/^(the|a|an|me|te|tek|card|karten|kartes)$/i.test(merchantCandidate)) {
+        result.merchant = merchantCandidate;
+      }
+    }
+  }
+
+  return result;
+}
+
 // Quick Expense Webhook (called by Apple Shortcuts or other webhooks)
 export async function quickExpenseWebhook(req: Request, res: Response) {
   try {
@@ -131,14 +211,29 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
       return res.status(401).json({ error: "Invalid API key" });
     }
 
+    const rawInputText = req.body.text || req.body.rawText || req.body.notification || req.body.message;
+    let parsedFromText: ParsedNotification = {};
+
+    if (rawInputText && typeof rawInputText === "string" && rawInputText.trim()) {
+      parsedFromText = parseTransactionFromText(rawInputText);
+    }
+
     const { amount, currency, merchant, description, cardName, category, date } = req.body;
 
-    if (amount === undefined || amount === null || amount === "") {
-      return res.status(400).json({ error: "amount is required" });
+    const effectiveAmount = amount !== undefined && amount !== null && amount !== "" ? amount : parsedFromText.amount;
+    const effectiveCurrency = currency || parsedFromText.currency;
+    const effectiveMerchant = (merchant || parsedFromText.merchant || "").trim();
+    const effectiveCardName = (cardName || parsedFromText.cardName || "").trim();
+    const parsedDigits = parsedFromText.cardDigits;
+
+    if (effectiveAmount === undefined || effectiveAmount === null || effectiveAmount === "") {
+      return res.status(400).json({
+        error: "Amount is required. Could not automatically extract an amount from the notification text.",
+      });
     }
 
     // Parse amount cleanly (handling strings like "$15.50", "3,100", or "ALL 3,100")
-    let cleanAmountStr = String(amount).replace(/,/g, "").trim();
+    let cleanAmountStr = String(effectiveAmount).replace(/,/g, "").trim();
     const matchNum = cleanAmountStr.match(/-?\d+(\.\d+)?/);
     const numericAmount = matchNum ? Math.abs(parseFloat(matchNum[0])) : NaN;
 
@@ -146,11 +241,15 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
       return res.status(400).json({ error: "Invalid amount value. Must be greater than 0." });
     }
 
-    // Detect currency from explicit field or amount string
-    let transactionCurrency = detectCurrency(currency, amount);
+    // Detect currency from explicit field, amount string, or parsed notification text
+    let transactionCurrency = detectCurrency(effectiveCurrency, effectiveAmount) || parsedFromText.currency;
 
     // Determine raw merchant/description
-    const baseDescription = (merchant || description || "Apple Pay Transaction").trim();
+    const baseDescription = (
+      effectiveMerchant ||
+      description ||
+      (rawInputText ? rawInputText.slice(0, 45).trim() : "Card Transaction")
+    ).trim();
 
     // Determine category
     const finalCategory =
@@ -187,19 +286,33 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
     // Match account
     let matchedAccount: typeof accounts[0] | null = null;
 
-    if (cardName && typeof cardName === "string" && cardName.trim()) {
-      const incomingCard = cardName.trim();
+    if (effectiveCardName || parsedDigits) {
+      const incomingCard = effectiveCardName || (parsedDigits ? `*${parsedDigits}` : "");
       const cardLower = incomingCard.toLowerCase();
       const cardClean = cleanCardString(incomingCard);
-      const incomingDigits = extractDigits(incomingCard);
+      const incomingDigits = extractDigits(incomingCard) || parsedDigits;
+
+      // 0. Match by card digits if provided by notification OCR
+      if (incomingDigits) {
+        const digitMatch = cardMappings.find((m) => {
+          const mapDigits = extractDigits(m.cardName);
+          return mapDigits === incomingDigits;
+        });
+        if (digitMatch) {
+          const found = accounts.find((a) => a.id === digitMatch.accountId);
+          if (found) matchedAccount = found;
+        }
+      }
 
       // 1. Exact match in explicit card mappings
-      const exactMapping = cardMappings.find(
-        (m) => m.cardName && m.cardName.trim().toLowerCase() === cardLower
-      );
-      if (exactMapping) {
-        const found = accounts.find((a) => a.id === exactMapping.accountId);
-        if (found) matchedAccount = found;
+      if (!matchedAccount) {
+        const exactMapping = cardMappings.find(
+          (m) => m.cardName && m.cardName.trim().toLowerCase() === cardLower
+        );
+        if (exactMapping) {
+          const found = accounts.find((a) => a.id === exactMapping.accountId);
+          if (found) matchedAccount = found;
+        }
       }
 
       // 2. Normalized card mapping match (e.g. "Monzo Mastercard *2120" matches "Monzo Mastercard")
@@ -283,7 +396,7 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
         return res.status(200).json({
           success: true,
           ignored: true,
-          message: `Transaction of ${numericAmount.toFixed(2)} at ${baseDescription} was skipped: Card "${cardName || "Unknown"}" is not linked to any Money Tracker account.`,
+          message: `Transaction of ${numericAmount.toFixed(2)} at ${baseDescription} was skipped: Card "${effectiveCardName || cardName || "Unknown"}" is not linked to any Money Tracker account.`,
         });
       }
 
