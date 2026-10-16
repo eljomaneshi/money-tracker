@@ -320,8 +320,9 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
     const parsedDigits = parsedFromText.cardDigits;
 
     if (effectiveAmount === undefined || effectiveAmount === null || effectiveAmount === "") {
+      const debugText = normalizedInputText ? `"${normalizedInputText.slice(0, 100)}"` : "(EMPTY/NO TEXT SENT)";
       return res.status(400).json({
-        error: "Amount is required. Could not automatically extract an amount from the notification text.",
+        error: `Amount is required. Could not automatically extract an amount. Server received: ${debugText}`,
       });
     }
 
