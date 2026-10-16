@@ -19,7 +19,6 @@ import {
   Save,
   ChevronDown,
   ChevronUp,
-  Camera,
 } from "lucide-react";
 import api from "../../lib/api";
 import { SettingsSection } from "./SettingsSection";
@@ -81,7 +80,6 @@ export function AppleShortcutsCard() {
 
   // Active instructions tabs
   const [showGuide, setShowGuide] = useState(false);
-  const [showBackTapGuide, setShowBackTapGuide] = useState(false);
 
   // Webhook URLs
   const prodBase =
@@ -760,117 +758,7 @@ export function AppleShortcutsCard() {
         )}
       </div>
 
-      {/* Step-by-Step Guide for Non-Apple Pay Purchases (Back Tap / Notification OCR) */}
-      <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-sm dark:border-white/5 dark:bg-[#070b14]/40">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/5">
-          <div className="flex items-center gap-2">
-            <Camera className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-              iPhone Back Tap Guide (For Online & Non-Apple Pay Card Purchases)
-            </h3>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowBackTapGuide(!showBackTapGuide)}
-            className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 hover:underline dark:text-purple-400"
-          >
-            {showBackTapGuide ? "Hide" : "Show"}
-            {showBackTapGuide ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-          </button>
-        </div>
 
-        {showBackTapGuide && (
-          <div className="space-y-4 pt-3">
-            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-              When you pay online (typing your card details on Amazon, Uber, or any website) and your bank app sends a notification banner (e.g. <em>"You spent £15.20 at Sainsbury's"</em> or <em>"Pagesë 3,500 ALL tek SPAR me kartën *7076"</em>), you can <strong>double-tap the back of your iPhone</strong> to log it instantly!
-            </p>
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 dark:border-white/5 dark:bg-white/[0.02]">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-purple-600 text-[11px] font-bold text-white">
-                    1
-                  </span>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                    Create Shortcut
-                  </h4>
-                </div>
-                <p className="mt-2 text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                  In the <strong>Shortcuts</strong> app, tap <strong>+ (New Shortcut)</strong> and name it <strong>"Log Notification"</strong>.
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 dark:border-white/5 dark:bg-white/[0.02]">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-purple-600 text-[11px] font-bold text-white">
-                    2
-                  </span>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                    Add 3 Actions (100% Silent)
-                  </h4>
-                </div>
-                <div className="mt-2 text-[11px] text-slate-600 dark:text-slate-400 space-y-1">
-                  <p>1. <strong>Take Screenshot</strong></p>
-                  <p>2. <strong>Extract Text from Image</strong> (Screenshot)</p>
-                  <p>3. <strong>Get Contents of URL</strong> (POST to Webhook)</p>
-                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400 pt-0.5">
-                    ✓ No popups: In-memory only (never saves to Photos library).
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 dark:border-white/5 dark:bg-white/[0.02]">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-purple-600 text-[11px] font-bold text-white">
-                    3
-                  </span>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                    Assign Back Tap
-                  </h4>
-                </div>
-                <p className="mt-2 text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                  Go to iPhone <strong>Settings → Accessibility → Touch → Back Tap → Double Tap</strong> and pick <strong>"Log Notification"</strong>!
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200/90 bg-slate-50/80 p-3.5 dark:border-white/5 dark:bg-[#0c1424]">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                Action "Get Contents of URL" Settings for Back Tap
-              </p>
-              <div className="mt-2.5 space-y-2 text-xs text-slate-600 dark:text-slate-300">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-1">
-                  <span className="w-28 font-semibold text-slate-900 dark:text-slate-100">URL:</span>
-                  <code className="break-all font-mono text-purple-600 dark:text-purple-400">{webhookUrl}</code>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-1">
-                  <span className="w-28 font-semibold text-slate-900 dark:text-slate-100">Method:</span>
-                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">POST</span>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-1">
-                  <span className="w-28 font-semibold text-slate-900 dark:text-slate-100">Headers:</span>
-                  <span className="break-all font-mono">
-                    Key: <strong className="text-indigo-600 dark:text-indigo-400">X-API-Key</strong> &rarr; Value:{" "}
-                    <strong className="text-indigo-600 dark:text-indigo-400">
-                      {apiKey || "(Your Generated API Key)"}
-                    </strong>
-                  </span>
-                </div>
-                <div className="flex flex-col gap-1 pt-1">
-                  <span className="font-semibold text-slate-900 dark:text-slate-100">Request Body (JSON):</span>
-                  <div className="relative mt-1">
-                    <pre className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-3 font-mono text-[11px] text-slate-800 dark:border-white/10 dark:bg-[#070b14] dark:text-slate-200">
-{`{
-  "text": Text from Image
-}`}
-                    </pre>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* Interactive Webhook Simulator / Quick Test */}
       <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4 sm:p-5 dark:border-white/5 dark:bg-[#070b14]/50">
