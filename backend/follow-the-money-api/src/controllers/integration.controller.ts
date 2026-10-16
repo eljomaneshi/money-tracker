@@ -280,6 +280,365 @@ export function parseTransactionFromText(rawText: string | string[] | any): Pars
   return result;
 }
 
+export function splitIntoTransactionChunks(rawText: string): string[] {
+  if (!rawText) return [];
+  const normalized = String(rawText).replace(/\r\n/g, "\n").trim();
+
+  // 1. Try splitting by double or more newlines (typical between notifications or stacked list items)
+  let chunks = normalized.split(/\n\s*\n+/).map((c) => c.trim()).filter(Boolean);
+
+  // 2. If only 1 chunk, look for repeating bank/app headers or payment verbs on separate lines
+  if (chunks.length <= 1) {
+    const boundaryRegex = /(?:^|\n)(?=(?:Monzo|Jet Bank|JetBank|Yuh|Revolut|Raiffeisen|BKT|Credins|Intesa|OTP|You paid|You spent|Pages[eë]|Blerje|Transaksion)\b)/gi;
+    const splitByHeader = normalized.split(boundaryRegex).map((c) => c.trim()).filter(Boolean);
+    if (splitByHeader.length > 1) {
+      chunks = splitByHeader;
+    }
+  }
+
+  // 3. If still 1 chunk, look for multiple lines that each look like a transaction amount
+  if (chunks.length <= 1) {
+    const lines = normalized.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+    const currPattern = /(?:[€$£]|ALL|EUR|GBP|USD|LEK)\s*[\d,]+|[\d,]+\s*(?:[€$£]|ALL|EUR|GBP|USD|LEK)/i;
+    const currencyLineCount = lines.filter((l) => currPattern.test(l)).length;
+
+    if (currencyLineCount > 1) {
+      const grouped: string[] = [];
+      let currentGroup: string[] = [];
+      for (const line of lines) {
+        if (currPattern.test(line) && currentGroup.length > 0 && currentGroup.some((g) => currPattern.test(g))) {
+          const isDualFollowUp = /^\s*\(\s*(?:[€$£]|ALL|EUR|GBP|USD|LEK)?\s*[\d,]+/i.test(line);
+          if (!isDualFollowUp) {
+            grouped.push(currentGroup.join("\n"));
+            currentGroup = [];
+          }
+        }
+        currentGroup.push(line);
+      }
+      if (currentGroup.length > 0) {
+        grouped.push(currentGroup.join("\n"));
+      }
+      if (grouped.length > 1) {
+        chunks = grouped;
+      }
+    }
+  }
+
+  return chunks;
+}
+
+export interface ProcessExpenseItemParams {
+  amount?: number | string;
+  currency?: Currency | string;
+  merchant?: string;
+  description?: string;
+  cardName?: string;
+  cardDigits?: string;
+  category?: string;
+  date?: string | Date;
+  rawInputSnippet?: string;
+}
+
+export interface ProcessExpenseResult {
+  status: "recorded" | "duplicate" | "ignored" | "invalid";
+  message: string;
+  expense?: any;
+  account?: any;
+  numericAmount?: number;
+  finalDeductionAmount?: number;
+  merchant?: string;
+  error?: string;
+}
+
+export async function processExpenseItem(
+  item: ProcessExpenseItemParams,
+  user: any,
+  accounts: any[],
+  rates: any
+): Promise<ProcessExpenseResult> {
+  const { amount, currency, merchant, description, cardName, cardDigits, category, date, rawInputSnippet } = item;
+
+  if (amount === undefined || amount === null || amount === "") {
+    return {
+      status: "invalid",
+      message: "Amount is required.",
+      error: "Amount is required.",
+    };
+  }
+
+  let cleanAmountStr = String(amount).replace(/,/g, "").trim();
+  const matchNum = cleanAmountStr.match(/-?\d+(\.\d+)?/);
+  const numericAmount = matchNum ? Math.abs(parseFloat(matchNum[0])) : NaN;
+
+  if (Number.isNaN(numericAmount) || numericAmount <= 0) {
+    return {
+      status: "invalid",
+      message: "Invalid amount value. Must be greater than 0.",
+      error: "Invalid amount value. Must be greater than 0.",
+    };
+  }
+
+  let transactionCurrency = detectCurrency(currency as string, amount) || (currency as Currency);
+
+  const baseDescription = (
+    merchant ||
+    description ||
+    rawInputSnippet ||
+    "Card Transaction"
+  ).trim();
+
+  const finalCategory =
+    category && typeof category === "string" && category.trim() !== "Other"
+      ? category.trim()
+      : autoDetectCategory(baseDescription);
+
+  let transactionDate = date
+    ? (date instanceof Date ? date : parseTransactionDate(date))
+    : new Date();
+
+  const rawSettings = (user.applePaySettings as any) || {};
+  const unmappedAction: "ignore" | "default" = rawSettings.unmappedAction || "ignore";
+  const defaultAccountId: number | null = rawSettings.defaultAccountId || null;
+  const cardMappings: ApplePayCardMapping[] = Array.isArray(rawSettings.cardMappings)
+    ? rawSettings.cardMappings
+    : [];
+
+  let matchedAccount: (typeof accounts)[0] | null = null;
+  const effectiveCardName = (cardName || "").trim();
+  const parsedDigits = cardDigits;
+
+  if (effectiveCardName || parsedDigits) {
+    const incomingCard = effectiveCardName || (parsedDigits ? `*${parsedDigits}` : "");
+    const cardLower = incomingCard.toLowerCase();
+    const cardClean = cleanCardString(incomingCard);
+    const incomingDigits = extractDigits(incomingCard) || parsedDigits;
+
+    // 0. Match by card digits if provided by notification OCR
+    if (incomingDigits) {
+      const digitMatch = cardMappings.find((m) => {
+        const mapDigits = extractDigits(m.cardName);
+        return mapDigits === incomingDigits;
+      });
+      if (digitMatch) {
+        const found = accounts.find((a) => a.id === digitMatch.accountId);
+        if (found) matchedAccount = found;
+      }
+    }
+
+    // 1. Exact match in explicit card mappings
+    if (!matchedAccount) {
+      const exactMapping = cardMappings.find(
+        (m) => m.cardName && m.cardName.trim().toLowerCase() === cardLower
+      );
+      if (exactMapping) {
+        const found = accounts.find((a) => a.id === exactMapping.accountId);
+        if (found) matchedAccount = found;
+      }
+    }
+
+    // 2. Normalized card mapping match
+    if (!matchedAccount) {
+      const normalizedMatches = cardMappings.filter((m) => {
+        if (!m.cardName) return false;
+        const mappingClean = cleanCardString(m.cardName);
+        if (mappingClean === cardClean) return true;
+        if (mappingClean.includes(cardClean) || cardClean.includes(mappingClean)) return true;
+        return false;
+      });
+
+      if (normalizedMatches.length === 1) {
+        const found = accounts.find((a) => a.id === normalizedMatches[0].accountId);
+        if (found) matchedAccount = found;
+      } else if (normalizedMatches.length > 1) {
+        if (incomingDigits) {
+          const digitMatch = normalizedMatches.find((m) => {
+            const mapDigits = extractDigits(m.cardName);
+            return mapDigits === incomingDigits;
+          });
+          if (digitMatch) {
+            const found = accounts.find((a) => a.id === digitMatch.accountId);
+            if (found) matchedAccount = found;
+          }
+        }
+
+        if (!matchedAccount && transactionCurrency) {
+          const currMatch = normalizedMatches.find((m) => {
+            const acc = accounts.find((a) => a.id === m.accountId);
+            return acc && acc.baseCurrency.toUpperCase() === transactionCurrency?.toUpperCase();
+          });
+          if (currMatch) {
+            const found = accounts.find((a) => a.id === currMatch.accountId);
+            if (found) matchedAccount = found;
+          }
+        }
+
+        if (!matchedAccount) {
+          const found = accounts.find((a) => a.id === normalizedMatches[0].accountId);
+          if (found) matchedAccount = found;
+        }
+      }
+    }
+
+    // 3. Exact match against account name
+    if (!matchedAccount) {
+      const exactMatch = accounts.find((a) => a.name.toLowerCase() === cardLower);
+      if (exactMatch) matchedAccount = exactMatch;
+    }
+
+    // 4. Partial keyword match
+    if (!matchedAccount) {
+      const partialMatch = accounts.find((a) => {
+        const accLower = a.name.toLowerCase();
+        const accClean = cleanCardString(a.name);
+        return (
+          accLower.includes(cardLower) ||
+          cardLower.includes(accLower) ||
+          accClean.includes(cardClean) ||
+          cardClean.includes(accClean)
+        );
+      });
+      if (partialMatch) matchedAccount = partialMatch;
+    }
+
+    // 5. Transaction currency match
+    if (!matchedAccount && transactionCurrency) {
+      const curCode: string = transactionCurrency;
+      const currAccounts = accounts.filter(
+        (a) => a.baseCurrency.toUpperCase() === curCode.toUpperCase()
+      );
+      if (currAccounts.length === 1) {
+        matchedAccount = currAccounts[0];
+      }
+    }
+  }
+
+  // Handle unmapped card
+  if (!matchedAccount) {
+    if (defaultAccountId) {
+      const def = accounts.find((a) => a.id === defaultAccountId);
+      if (def) matchedAccount = def;
+    }
+
+    if (!matchedAccount && unmappedAction === "ignore") {
+      return {
+        status: "ignored",
+        message: `Transaction of ${numericAmount.toFixed(2)} at ${baseDescription} was skipped: Card "${effectiveCardName || "Unknown"}" is not linked to any Money Tracker account.`,
+        merchant: baseDescription,
+        numericAmount,
+      };
+    }
+
+    if (!matchedAccount) {
+      matchedAccount = accounts[0];
+    }
+  }
+
+  // Intelligent Currency Detection & Multi-Currency Conversion
+  if (!transactionCurrency) {
+    if (user.totalsMainCurrency && user.totalsMainCurrency !== matchedAccount.baseCurrency) {
+      if (user.totalsMainCurrency === "ALL" && numericAmount >= 100) {
+        transactionCurrency = "ALL";
+      } else {
+        transactionCurrency = matchedAccount.baseCurrency as Currency;
+      }
+    } else {
+      transactionCurrency = matchedAccount.baseCurrency as Currency;
+    }
+  }
+
+  let finalDeductionAmount = numericAmount;
+  let currencyNote = "";
+
+  if (transactionCurrency && transactionCurrency !== matchedAccount.baseCurrency) {
+    try {
+      finalDeductionAmount = convertAmount(
+        numericAmount,
+        transactionCurrency,
+        matchedAccount.baseCurrency as Currency,
+        rates
+      );
+      currencyNote = ` (${formatMoney(numericAmount, transactionCurrency)})`;
+    } catch (rateErr) {
+      console.error("Exchange rate conversion error:", rateErr);
+      finalDeductionAmount = numericAmount;
+    }
+  }
+
+  const finalDescription = (baseDescription + currencyNote).trim();
+
+  // Duplicate Protection (Idempotency) - 30 minutes check
+  const recentThreshold = new Date(Date.now() - 30 * 60 * 1000);
+  const existingDuplicate = await prisma.expense.findFirst({
+    where: {
+      userId: user.id,
+      accountId: matchedAccount.id,
+      amount: {
+        gte: finalDeductionAmount - 0.01,
+        lte: finalDeductionAmount + 0.01,
+      },
+      description: finalDescription,
+      createdAt: { gte: recentThreshold },
+    },
+  });
+
+  if (existingDuplicate) {
+    const minutesAgo = Math.max(1, Math.round((Date.now() - existingDuplicate.createdAt.getTime()) / 60000));
+    return {
+      status: "duplicate",
+      message: `Already recorded: "${finalDescription}" (${formatMoney(finalDeductionAmount, matchedAccount.baseCurrency as Currency)}) was already logged ${minutesAgo}m ago. Skipped duplicate.`,
+      expense: existingDuplicate,
+      account: {
+        id: matchedAccount.id,
+        name: matchedAccount.name,
+        remainingBalance: matchedAccount.balance,
+        currency: matchedAccount.baseCurrency,
+      },
+      merchant: baseDescription,
+      numericAmount,
+      finalDeductionAmount,
+    };
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    const updatedAccount = await tx.account.update({
+      where: { id: matchedAccount.id },
+      data: {
+        balance: {
+          decrement: finalDeductionAmount,
+        },
+      },
+    });
+
+    const expense = await tx.expense.create({
+      data: {
+        userId: user.id,
+        amount: finalDeductionAmount,
+        date: transactionDate,
+        category: finalCategory,
+        description: finalDescription,
+        accountId: matchedAccount.id,
+      },
+    });
+
+    return { expense, updatedAccount };
+  });
+
+  return {
+    status: "recorded",
+    message: `Recorded ${formatMoney(finalDeductionAmount, matchedAccount.baseCurrency as Currency)} at ${baseDescription} under ${finalCategory} (${matchedAccount.name})${currencyNote ? ` converted from ${formatMoney(numericAmount, transactionCurrency!)}` : ""}`,
+    expense: result.expense,
+    account: {
+      id: result.updatedAccount.id,
+      name: result.updatedAccount.name,
+      remainingBalance: result.updatedAccount.balance,
+      currency: result.updatedAccount.baseCurrency,
+    },
+    merchant: baseDescription,
+    numericAmount,
+    finalDeductionAmount,
+  };
+}
+
 // Quick Expense Webhook (called by Apple Shortcuts or other webhooks)
 export async function quickExpenseWebhook(req: Request, res: Response) {
   try {
@@ -299,66 +658,6 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
       return res.status(401).json({ error: "Invalid API key" });
     }
 
-    const rawInputText = req.body.text ?? req.body.rawText ?? req.body.notification ?? req.body.message;
-    let parsedFromText: ParsedNotification = {};
-
-    let normalizedInputText = "";
-    if (Array.isArray(rawInputText)) {
-      normalizedInputText = rawInputText.map((t) => String(t || "").trim()).filter(Boolean).join(" ");
-    } else if (rawInputText && typeof rawInputText === "object") {
-      normalizedInputText = Object.values(rawInputText).map((t) => String(t || "").trim()).filter(Boolean).join(" ");
-    } else if (typeof rawInputText === "string") {
-      normalizedInputText = rawInputText.trim();
-    }
-
-    if (normalizedInputText) {
-      parsedFromText = parseTransactionFromText(normalizedInputText);
-    }
-
-    const { amount, currency, merchant, description, cardName, category, date } = req.body;
-
-    const effectiveAmount = amount !== undefined && amount !== null && amount !== "" ? amount : parsedFromText.amount;
-    const effectiveCurrency = currency || parsedFromText.currency;
-    const effectiveMerchant = (merchant || parsedFromText.merchant || "").trim();
-    const effectiveCardName = (cardName || parsedFromText.cardName || "").trim();
-    const parsedDigits = parsedFromText.cardDigits;
-
-    if (effectiveAmount === undefined || effectiveAmount === null || effectiveAmount === "") {
-      const debugText = normalizedInputText ? `"${normalizedInputText.slice(0, 100)}"` : "(EMPTY/NO TEXT SENT)";
-      return res.status(400).json({
-        error: `Amount is required. Could not automatically extract an amount. Server received: ${debugText}`,
-      });
-    }
-
-    // Parse amount cleanly (handling strings like "$15.50", "3,100", or "ALL 3,100")
-    let cleanAmountStr = String(effectiveAmount).replace(/,/g, "").trim();
-    const matchNum = cleanAmountStr.match(/-?\d+(\.\d+)?/);
-    const numericAmount = matchNum ? Math.abs(parseFloat(matchNum[0])) : NaN;
-
-    if (Number.isNaN(numericAmount) || numericAmount <= 0) {
-      return res.status(400).json({ error: "Invalid amount value. Must be greater than 0." });
-    }
-
-    // Detect currency from explicit field, amount string, or parsed notification text
-    let transactionCurrency = detectCurrency(effectiveCurrency, effectiveAmount) || parsedFromText.currency;
-
-    // Determine raw merchant/description
-    const baseDescription = (
-      effectiveMerchant ||
-      description ||
-      (rawInputText ? rawInputText.slice(0, 45).trim() : "Card Transaction")
-    ).trim();
-
-    // Determine category
-    const finalCategory =
-      category && typeof category === "string" && category.trim() !== "Other"
-        ? category.trim()
-        : autoDetectCategory(baseDescription);
-
-    // Parse transaction date
-    let transactionDate = date ? parseTransactionDate(date) : new Date();
-
-    // Find user's active accounts
     const accounts = await prisma.account.findMany({
       where: {
         userId: user.id,
@@ -373,254 +672,140 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
       });
     }
 
-    // Parse user's Apple Pay multi-card settings
-    const rawSettings = (user.applePaySettings as any) || {};
-    const unmappedAction: "ignore" | "default" = rawSettings.unmappedAction || "ignore";
-    const defaultAccountId: number | null = rawSettings.defaultAccountId || null;
-    const cardMappings: ApplePayCardMapping[] = Array.isArray(rawSettings.cardMappings)
-      ? rawSettings.cardMappings
-      : [];
+    const rates = await fetchExchangeRates().catch(() => ({}));
 
-    // Match account
-    let matchedAccount: typeof accounts[0] | null = null;
-
-    if (effectiveCardName || parsedDigits) {
-      const incomingCard = effectiveCardName || (parsedDigits ? `*${parsedDigits}` : "");
-      const cardLower = incomingCard.toLowerCase();
-      const cardClean = cleanCardString(incomingCard);
-      const incomingDigits = extractDigits(incomingCard) || parsedDigits;
-
-      // 0. Match by card digits if provided by notification OCR
-      if (incomingDigits) {
-        const digitMatch = cardMappings.find((m) => {
-          const mapDigits = extractDigits(m.cardName);
-          return mapDigits === incomingDigits;
-        });
-        if (digitMatch) {
-          const found = accounts.find((a) => a.id === digitMatch.accountId);
-          if (found) matchedAccount = found;
-        }
+    // If explicit amount is provided (e.g. from simulator or structured webhook)
+    if (req.body.amount !== undefined && req.body.amount !== null && req.body.amount !== "") {
+      const result = await processExpenseItem(req.body, user, accounts, rates);
+      if (result.status === "invalid") {
+        return res.status(400).json({ error: result.error || result.message });
       }
-
-      // 1. Exact match in explicit card mappings
-      if (!matchedAccount) {
-        const exactMapping = cardMappings.find(
-          (m) => m.cardName && m.cardName.trim().toLowerCase() === cardLower
-        );
-        if (exactMapping) {
-          const found = accounts.find((a) => a.id === exactMapping.accountId);
-          if (found) matchedAccount = found;
-        }
-      }
-
-      // 2. Normalized card mapping match (e.g. "Monzo Mastercard *2120" matches "Monzo Mastercard")
-      if (!matchedAccount) {
-        const normalizedMatches = cardMappings.filter((m) => {
-          if (!m.cardName) return false;
-          const mappingClean = cleanCardString(m.cardName);
-          if (mappingClean === cardClean) return true;
-          if (mappingClean.includes(cardClean) || cardClean.includes(mappingClean)) return true;
-          return false;
-        });
-
-        if (normalizedMatches.length === 1) {
-          const found = accounts.find((a) => a.id === normalizedMatches[0].accountId);
-          if (found) matchedAccount = found;
-        } else if (normalizedMatches.length > 1) {
-          // If multiple matches (e.g. two "Mastercard Debit" cards from Jet Bank)
-          // A) Try matching digits if present in incoming card
-          if (incomingDigits) {
-            const digitMatch = normalizedMatches.find((m) => {
-              const mapDigits = extractDigits(m.cardName);
-              return mapDigits === incomingDigits;
-            });
-            if (digitMatch) {
-              const found = accounts.find((a) => a.id === digitMatch.accountId);
-              if (found) matchedAccount = found;
-            }
-          }
-
-          // B) Try matching by transaction currency (e.g. ALL card vs EUR card)
-          if (!matchedAccount && transactionCurrency) {
-            const currMatch = normalizedMatches.find((m) => {
-              const acc = accounts.find((a) => a.id === m.accountId);
-              return acc && acc.baseCurrency.toUpperCase() === transactionCurrency?.toUpperCase();
-            });
-            if (currMatch) {
-              const found = accounts.find((a) => a.id === currMatch.accountId);
-              if (found) matchedAccount = found;
-            }
-          }
-
-          // C) Fallback to first normalized match
-          if (!matchedAccount) {
-            const found = accounts.find((a) => a.id === normalizedMatches[0].accountId);
-            if (found) matchedAccount = found;
-          }
-        }
-      }
-
-      // 3. Exact match against account name
-      if (!matchedAccount) {
-        const exactMatch = accounts.find((a) => a.name.toLowerCase() === cardLower);
-        if (exactMatch) matchedAccount = exactMatch;
-      }
-
-      // 4. Partial keyword match (e.g. "Monzo" in "Monzo Mastercard")
-      if (!matchedAccount) {
-        const partialMatch = accounts.find((a) => {
-          const accLower = a.name.toLowerCase();
-          const accClean = cleanCardString(a.name);
-          return (
-            accLower.includes(cardLower) ||
-            cardLower.includes(accLower) ||
-            accClean.includes(cardClean) ||
-            cardClean.includes(accClean)
-          );
-        });
-        if (partialMatch) matchedAccount = partialMatch;
-      }
-
-      // 5. Transaction currency match (e.g. if currency is GBP and user has a Monzo GBP account)
-      if (!matchedAccount && transactionCurrency) {
-        const curCode: string = transactionCurrency;
-        const currAccounts = accounts.filter(
-          (a) => a.baseCurrency.toUpperCase() === curCode.toUpperCase()
-        );
-        if (currAccounts.length === 1) {
-          matchedAccount = currAccounts[0];
-        }
-      }
-    }
-
-    // Handle unmapped card
-    if (!matchedAccount) {
-      // If default account is specified, use it
-      if (defaultAccountId) {
-        const def = accounts.find((a) => a.id === defaultAccountId);
-        if (def) matchedAccount = def;
-      }
-
-      // If still unmapped and policy is ignore, skip safely
-      if (!matchedAccount && unmappedAction === "ignore") {
+      if (result.status === "ignored" || result.status === "duplicate") {
         return res.status(200).json({
           success: true,
-          ignored: true,
-          message: `Transaction of ${numericAmount.toFixed(2)} at ${baseDescription} was skipped: Card "${effectiveCardName || cardName || "Unknown"}" is not linked to any Money Tracker account.`,
+          [result.status]: true,
+          message: result.message,
+          expense: result.expense,
+          account: result.account,
         });
       }
-
-      // If policy is default or no mapping matched, use first account
-      if (!matchedAccount) {
-        matchedAccount = accounts[0];
-      }
+      return res.status(201).json({
+        success: true,
+        message: result.message,
+        expense: result.expense,
+        account: result.account,
+      });
     }
 
-    // Intelligent Currency Detection & Multi-Currency Conversion
-    if (!transactionCurrency) {
-      if (user.totalsMainCurrency && user.totalsMainCurrency !== matchedAccount.baseCurrency) {
-        // If user's primary ledger currency is ALL, and the amount is typical of Lek (>= 100),
-        // infer ALL rather than incorrectly treating a large Lek number as GBP/EUR
-        if (user.totalsMainCurrency === "ALL" && numericAmount >= 100) {
-          transactionCurrency = "ALL";
-        } else {
-          transactionCurrency = matchedAccount.baseCurrency as Currency;
-        }
-      } else {
-        transactionCurrency = matchedAccount.baseCurrency as Currency;
-      }
+    // Otherwise, parse from text
+    const rawInputText = req.body.text ?? req.body.rawText ?? req.body.notification ?? req.body.message;
+    let normalizedInputText = "";
+    if (Array.isArray(rawInputText)) {
+      normalizedInputText = rawInputText.map((t) => String(t || "").trim()).filter(Boolean).join(" ");
+    } else if (rawInputText && typeof rawInputText === "object") {
+      normalizedInputText = Object.values(rawInputText).map((t) => String(t || "").trim()).filter(Boolean).join(" ");
+    } else if (typeof rawInputText === "string") {
+      normalizedInputText = rawInputText.trim();
     }
 
-    let finalDeductionAmount = numericAmount;
-    let currencyNote = "";
-
-    if (transactionCurrency && transactionCurrency !== matchedAccount.baseCurrency) {
-      try {
-        const rates = await fetchExchangeRates();
-        finalDeductionAmount = convertAmount(
-          numericAmount,
-          transactionCurrency,
-          matchedAccount.baseCurrency as Currency,
-          rates
-        );
-        currencyNote = ` (${formatMoney(numericAmount, transactionCurrency)})`;
-      } catch (rateErr) {
-        console.error("Exchange rate conversion error:", rateErr);
-        finalDeductionAmount = numericAmount;
-      }
+    if (!normalizedInputText) {
+      return res.status(400).json({
+        error: "Amount is required. Could not automatically extract an amount. Server received: (EMPTY/NO TEXT SENT)",
+      });
     }
 
-    const finalDescription = (baseDescription + currencyNote).trim();
-
-    // Automated card transactions have already completed at POS; record expense even if account balance is low
-    const isOverdrawn = matchedAccount.balance < finalDeductionAmount;
-
-    // Duplicate Protection (Idempotency)
-    // If an identical transaction was recorded within the last 30 minutes, skip to prevent double-charging
-    const recentThreshold = new Date(Date.now() - 30 * 60 * 1000);
-    const existingDuplicate = await prisma.expense.findFirst({
-      where: {
-        userId: user.id,
-        accountId: matchedAccount.id,
-        amount: {
-          gte: finalDeductionAmount - 0.01,
-          lte: finalDeductionAmount + 0.01,
-        },
-        description: finalDescription,
-        createdAt: { gte: recentThreshold },
-      },
+    // Check if the text contains multiple transactions
+    const chunks = splitIntoTransactionChunks(normalizedInputText);
+    const candidateItems: ProcessExpenseItemParams[] = chunks.map((chunk) => {
+      const parsed = parseTransactionFromText(chunk);
+      return {
+        ...parsed,
+        rawInputSnippet: chunk.slice(0, 45).trim(),
+        category: req.body.category,
+        date: req.body.date,
+      };
     });
 
-    if (existingDuplicate) {
-      const minutesAgo = Math.max(1, Math.round((Date.now() - existingDuplicate.createdAt.getTime()) / 60000));
+    const validItems = candidateItems.filter(
+      (c) => c.amount !== undefined && !Number.isNaN(Number(c.amount)) && Number(c.amount) > 0
+    );
+
+    // If multiple distinct transactions were identified in the text
+    if (validItems.length > 1) {
+      const recorded: any[] = [];
+      const duplicates: any[] = [];
+      const ignored: any[] = [];
+
+      for (const item of validItems) {
+        const itemResult = await processExpenseItem(item, user, accounts, rates);
+        if (itemResult.status === "recorded") {
+          recorded.push(itemResult);
+        } else if (itemResult.status === "duplicate") {
+          duplicates.push(itemResult);
+        } else if (itemResult.status === "ignored") {
+          ignored.push(itemResult);
+        }
+      }
+
+      const totalCount = validItems.length;
+      const recCount = recorded.length;
+      const dupCount = duplicates.length;
+
+      let summaryMessage = `Processed ${totalCount} transactions: ${recCount} recorded`;
+      if (dupCount > 0) {
+        summaryMessage += `, ${dupCount} already recorded in last 30m`;
+      }
+      if (ignored.length > 0) {
+        summaryMessage += `, ${ignored.length} unmapped cards skipped`;
+      }
+      summaryMessage += ".";
+
+      return res.status(recCount > 0 ? 201 : 200).json({
+        success: true,
+        multi: true,
+        message: summaryMessage,
+        recordedCount: recCount,
+        duplicateCount: dupCount,
+        ignoredCount: ignored.length,
+        recorded,
+        duplicates,
+        ignored,
+      });
+    }
+
+    // Single transaction fallback (or when only 1 valid item found)
+    const singleParsed = validItems[0] || parseTransactionFromText(normalizedInputText);
+    const singleItem: ProcessExpenseItemParams = {
+      ...singleParsed,
+      rawInputSnippet: normalizedInputText.slice(0, 45).trim(),
+      category: req.body.category,
+      date: req.body.date,
+    };
+
+    const singleResult = await processExpenseItem(singleItem, user, accounts, rates);
+
+    if (singleResult.status === "invalid") {
+      const debugText = normalizedInputText ? `"${normalizedInputText.slice(0, 100)}"` : "(EMPTY/NO TEXT SENT)";
+      return res.status(400).json({
+        error: `Amount is required. Could not automatically extract an amount. Server received: ${debugText}`,
+      });
+    }
+
+    if (singleResult.status === "ignored" || singleResult.status === "duplicate") {
       return res.status(200).json({
         success: true,
-        duplicate: true,
-        message: `Already recorded: "${finalDescription}" (${formatMoney(finalDeductionAmount, matchedAccount.baseCurrency as Currency)}) was already logged ${minutesAgo}m ago. Skipped duplicate.`,
-        expense: existingDuplicate,
-        account: {
-          id: matchedAccount.id,
-          name: matchedAccount.name,
-          remainingBalance: matchedAccount.balance,
-          currency: matchedAccount.baseCurrency,
-        },
+        [singleResult.status]: true,
+        message: singleResult.message,
+        expense: singleResult.expense,
+        account: singleResult.account,
       });
     }
-
-    const result = await prisma.$transaction(async (tx) => {
-      const updatedAccount = await tx.account.update({
-        where: { id: matchedAccount.id },
-        data: {
-          balance: {
-            decrement: finalDeductionAmount,
-          },
-        },
-      });
-
-      const expense = await tx.expense.create({
-        data: {
-          userId: user.id,
-          amount: finalDeductionAmount,
-          date: transactionDate,
-          category: finalCategory,
-          description: finalDescription,
-          accountId: matchedAccount.id,
-        },
-      });
-
-      return { expense, updatedAccount };
-    });
 
     return res.status(201).json({
       success: true,
-      message: `Recorded ${formatMoney(finalDeductionAmount, matchedAccount.baseCurrency as Currency)} at ${baseDescription} under ${finalCategory} (${matchedAccount.name})${currencyNote ? ` converted from ${formatMoney(numericAmount, transactionCurrency!)}` : ""}`,
-      expense: result.expense,
-      account: {
-        id: result.updatedAccount.id,
-        name: result.updatedAccount.name,
-        remainingBalance: result.updatedAccount.balance,
-        currency: result.updatedAccount.baseCurrency,
-      },
+      message: singleResult.message,
+      expense: singleResult.expense,
+      account: singleResult.account,
     });
   } catch (err: any) {
     console.error("Quick expense webhook error:", err);
