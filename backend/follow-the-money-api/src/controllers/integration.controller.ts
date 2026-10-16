@@ -80,6 +80,7 @@ function cleanCardString(str: string): string {
     .toLowerCase()
     .replace(/[*#xX\s\-_]+\d{3,4}\b/g, "") // removes *7076, #9897, 2120 at end
     .replace(/[*#]/g, "")
+    .replace(/\b(mastercard|visa|debit|credit|card|pass)\b/gi, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -137,34 +138,66 @@ export function parseTransactionFromText(rawText: string | string[] | any): Pars
   const lower = fullText.toLowerCase();
   const result: ParsedNotification = {};
 
+  // Helper to map currency symbols/strings to Currency type
+  const normalizeCurrencyCode = (c: string): Currency | undefined => {
+    if (!c) return undefined;
+    const upper = c.trim().toUpperCase();
+    if (upper === "€" || upper === "EUR" || upper === "978") return "EUR";
+    if (upper === "£" || upper === "GBP" || upper === "826") return "GBP";
+    if (upper === "$" || upper === "USD" || upper === "840") return "USD";
+    if (upper === "ALL" || upper === "LEK" || upper === "LEKE" || upper === "008") return "ALL";
+    return undefined;
+  };
+
   // Find the specific sentence or notification fragment that mentions payment / amount
-  // If there are multiple notifications (e.g. "Sent a video", "You paid 0.01 EUR..."),
-  // isolate the segment around payment verbs
   const paymentSegmentRegex = /(?:you paid|paid|spent|pages[eë]|blerje|transaksion|payment|purchase)[\s\S]{5,150}?(?=\.(?!\d)|\n|$)/i;
   const segmentMatch = fullText.match(paymentSegmentRegex);
   const targetText = segmentMatch ? segmentMatch[0] : fullText;
 
-  // 1. Detect Currency (check targetText first, then fullText)
-  if (/(\bALL\b|\bLEK\b|\bLEKE\b)/i.test(targetText) || /(\bALL\b|\bLEK\b|\bLEKE\b)/i.test(fullText)) {
-    result.currency = "ALL";
-  } else if (/(\bEUR\b|€)/i.test(targetText) || /(\bEUR\b|€)/i.test(fullText)) {
-    result.currency = "EUR";
-  } else if (/(\bGBP\b|£)/i.test(targetText) || /(\bGBP\b|£)/i.test(fullText)) {
-    result.currency = "GBP";
-  } else if (/(\bUSD\b|\$)/i.test(targetText) || /(\bUSD\b|\$)/i.test(fullText)) {
-    result.currency = "USD";
+  // 1. Check for Dual Currency format: e.g. "£26.94 (ALL 2,872)" or "26.94 GBP (2,872 ALL)"
+  const dualMatch = fullText.match(/(?:([£€$]|GBP|EUR|USD|ALL)\s*([\d,]+(?:\.\d+)?))\s*\((?:([£€$]|GBP|EUR|USD|ALL)\s*([\d,]+(?:\.\d+)?))\)/i);
+  if (dualMatch) {
+    const cur1 = normalizeCurrencyCode(dualMatch[1]);
+    const amt1 = parseFloat(dualMatch[2].replace(/,/g, ""));
+    const cur2 = normalizeCurrencyCode(dualMatch[3]);
+    const amt2 = parseFloat(dualMatch[4].replace(/,/g, ""));
+
+    // If card is Monzo (GBP account), prefer the billed GBP amount
+    if (cur1 && !Number.isNaN(amt1) && amt1 > 0) {
+      result.currency = cur1;
+      result.amount = amt1;
+    } else if (cur2 && !Number.isNaN(amt2) && amt2 > 0) {
+      result.currency = cur2;
+      result.amount = amt2;
+    }
   }
 
-  // 2. Extract Amount
-  const currWithNumRegex = /(?:([€$£]|ALL|EUR|GBP|USD|LEK)\s*([0-9]{1,3}(?:[,\s][0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?))|([0-9]{1,3}(?:[,\s][0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s*([€$£]|ALL|EUR|GBP|USD|LEK)/i;
-  let currMatch = targetText.match(currWithNumRegex);
-  if (!currMatch) currMatch = fullText.match(currWithNumRegex);
+  // 2. Single Currency & Amount extraction (paired together so currency symbol matches amount)
+  if (!result.amount) {
+    const currWithNumRegex = /(?:([€$£]|ALL|EUR|GBP|USD|LEK)\s*([0-9]{1,3}(?:[,\s][0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?))|([0-9]{1,3}(?:[,\s][0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s*([€$£]|ALL|EUR|GBP|USD|LEK)/i;
+    let currMatch = targetText.match(currWithNumRegex) || fullText.match(currWithNumRegex);
 
-  if (currMatch) {
-    const rawNum = (currMatch[2] || currMatch[3] || "").replace(/[\s,]/g, "");
-    const parsed = parseFloat(rawNum);
-    if (!Number.isNaN(parsed) && parsed > 0) {
-      result.amount = parsed;
+    if (currMatch) {
+      const matchedCur = currMatch[1] || currMatch[4];
+      const rawNum = (currMatch[2] || currMatch[3] || "").replace(/[\s,]/g, "");
+      const parsed = parseFloat(rawNum);
+      if (!Number.isNaN(parsed) && parsed > 0) {
+        result.amount = parsed;
+        result.currency = normalizeCurrencyCode(matchedCur);
+      }
+    }
+  }
+
+  // Fallback standalone currency detection if amount was found without currency
+  if (!result.currency) {
+    if (/(\bALL\b|\bLEK\b|\bLEKE\b)/i.test(targetText) || /(\bALL\b|\bLEK\b|\bLEKE\b)/i.test(fullText)) {
+      result.currency = "ALL";
+    } else if (/(\bEUR\b|€)/i.test(targetText) || /(\bEUR\b|€)/i.test(fullText)) {
+      result.currency = "EUR";
+    } else if (/(\bGBP\b|£)/i.test(targetText) || /(\bGBP\b|£)/i.test(fullText)) {
+      result.currency = "GBP";
+    } else if (/(\bUSD\b|\$)/i.test(targetText) || /(\bUSD\b|\$)/i.test(fullText)) {
+      result.currency = "USD";
     }
   }
 
@@ -208,18 +241,36 @@ export function parseTransactionFromText(rawText: string | string[] | any): Pars
   }
 
   // 4. Extract Merchant
-  const triggerRegex = /(?:at|to|tek|te|tek dyqani|te tregtari|aprovuar tek|dyqani|merchant:?)\s+/i;
-  const matchTrigger = targetText.match(triggerRegex) || fullText.match(triggerRegex);
-  const sourceTextForMerchant = segmentMatch ? targetText : fullText;
-  if (matchTrigger && matchTrigger.index !== undefined) {
-    const after = sourceTextForMerchant.slice(matchTrigger.index + matchTrigger[0].length).trim();
-    const stopWords = /(?:\s+(?:with|me|nga|on|using|approved|successful|dhe|date|sukses\w*|\*|\b\d{4}\b)[\s\S]*$)/i;
-    const merchantCandidate = after.replace(stopWords, "").trim();
-    if (merchantCandidate && merchantCandidate.length >= 2 && merchantCandidate.length <= 40) {
-      if (!/^(the|a|an|me|te|tek|card|karten|kartes|your)$/i.test(merchantCandidate)) {
-        result.merchant = merchantCandidate;
+  // First check Monzo lock screen notification layout: "Monzo \n Rossman & Lala \n ALL 2,872"
+  const monzoLayoutMatch = fullText.match(/Monzo\s+([A-Za-z0-9&.\- ]+?)\s+(?:ALL|EUR|GBP|USD|[€$£]|\d{1,2}:\d{2})/i);
+  if (monzoLayoutMatch && monzoLayoutMatch[1].trim().length >= 2 && !/^(card|payment|mastercard|approved)$/i.test(monzoLayoutMatch[1].trim())) {
+    result.merchant = monzoLayoutMatch[1].trim();
+  }
+
+  // Standard "at / to / tek / dyqani" pattern
+  if (!result.merchant) {
+    const triggerRegex = /(?:at|to|tek|te|tek dyqani|te tregtari|aprovuar tek|dyqani|merchant:?)\s+/i;
+    const matchTrigger = targetText.match(triggerRegex) || fullText.match(triggerRegex);
+    const sourceTextForMerchant = segmentMatch ? targetText : fullText;
+    if (matchTrigger && matchTrigger.index !== undefined) {
+      const after = sourceTextForMerchant.slice(matchTrigger.index + matchTrigger[0].length).trim();
+      const stopWords = /(?:\s+(?:with|me|nga|on|using|approved|successful|dhe|date|sukses\w*|\*|\b\d{4}\b|\b\d+\s*(?:h|m|s|d|min|mins|hr|hrs|hour|hours|day|days)\s*ago\b|\b(?:yesterday|today|now)\b|\b\d{1,2}:\d{2}\b)[\s\S]*$)/i;
+      const merchantCandidate = after.replace(stopWords, "").trim();
+      if (merchantCandidate && merchantCandidate.length >= 2 && merchantCandidate.length <= 40) {
+        if (!/^(the|a|an|me|te|tek|card|karten|kartes|your)$/i.test(merchantCandidate)) {
+          result.merchant = merchantCandidate;
+        }
       }
     }
+  }
+
+  // Final cleanup on merchant: strip any trailing relative time like "3h ago" or "now"
+  if (result.merchant) {
+    result.merchant = result.merchant
+      .replace(/\s+\d+\s*(?:h|m|s|d|min|mins|hr|hrs|hour|hours|day|days)\s*ago\b/gi, "")
+      .replace(/\s+(?:yesterday|today|now)\b/gi, "")
+      .replace(/\s+\d{1,2}:\d{2}\b/g, "")
+      .trim();
   }
 
   return result;
@@ -455,15 +506,18 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
     }
 
     // Intelligent Currency Detection & Multi-Currency Conversion
-    // If currency was not passed, but user totalsMainCurrency is known and account currency differs:
-    // e.g. Monzo is GBP, user primary currency is ALL, and amount is 3,100 (which exceeds GBP balance)
-    if (
-      !transactionCurrency &&
-      user.totalsMainCurrency &&
-      user.totalsMainCurrency !== matchedAccount.baseCurrency &&
-      numericAmount > matchedAccount.balance
-    ) {
-      transactionCurrency = user.totalsMainCurrency as Currency;
+    if (!transactionCurrency) {
+      if (user.totalsMainCurrency && user.totalsMainCurrency !== matchedAccount.baseCurrency) {
+        // If user's primary ledger currency is ALL, and the amount is typical of Lek (>= 100),
+        // infer ALL rather than incorrectly treating a large Lek number as GBP/EUR
+        if (user.totalsMainCurrency === "ALL" && numericAmount >= 100) {
+          transactionCurrency = "ALL";
+        } else {
+          transactionCurrency = matchedAccount.baseCurrency as Currency;
+        }
+      } else {
+        transactionCurrency = matchedAccount.baseCurrency as Currency;
+      }
     }
 
     let finalDeductionAmount = numericAmount;
@@ -487,12 +541,8 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
 
     const finalDescription = (baseDescription + currencyNote).trim();
 
-    // Balance Check (Prevent negative account balance against converted amount)
-    if (matchedAccount.balance < finalDeductionAmount) {
-      return res.status(400).json({
-        error: `Insufficient balance in ${matchedAccount.name}. Available balance is ${matchedAccount.balance.toFixed(2)} ${matchedAccount.baseCurrency}, but transaction requires ${finalDeductionAmount.toFixed(2)} ${matchedAccount.baseCurrency}${currencyNote}. Transaction rejected.`,
-      });
-    }
+    // Automated card transactions have already completed at POS; record expense even if account balance is low
+    const isOverdrawn = matchedAccount.balance < finalDeductionAmount;
 
     // Duplicate Protection (Idempotency)
     // If an identical transaction was recorded within the last 30 minutes, skip to prevent double-charging

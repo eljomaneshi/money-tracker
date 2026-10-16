@@ -94,10 +94,10 @@ export function detectCurrency(
 ): Currency | null {
     if (typeof currencyInput === "string" && currencyInput.trim()) {
         const c = currencyInput.trim().toUpperCase();
-        if (c === "ALL" || c === "LEK" || c === "LEKE") return "ALL";
-        if (c === "EUR" || c === "€") return "EUR";
-        if (c === "GBP" || c === "£") return "GBP";
-        if (c === "USD" || c === "$") return "USD";
+        if (c === "ALL" || c === "LEK" || c === "LEKE" || c === "008") return "ALL";
+        if (c === "EUR" || c === "€" || c === "978") return "EUR";
+        if (c === "GBP" || c === "£" || c === "826") return "GBP";
+        if (c === "USD" || c === "$" || c === "840") return "USD";
     }
 
     if (typeof amountInput === "string") {
