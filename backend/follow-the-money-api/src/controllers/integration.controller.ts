@@ -476,16 +476,28 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
         if (partialMatch) matchedAccount = partialMatch;
       }
 
-      // 5. Currency match
-      if (!matchedAccount) {
-        const currencyMatch = accounts.find((a) => a.baseCurrency.toLowerCase() === cardLower);
-        if (currencyMatch) matchedAccount = currencyMatch;
+      // 5. Transaction currency match (e.g. if currency is GBP and user has a Monzo GBP account)
+      if (!matchedAccount && transactionCurrency) {
+        const curCode: string = transactionCurrency;
+        const currAccounts = accounts.filter(
+          (a) => a.baseCurrency.toUpperCase() === curCode.toUpperCase()
+        );
+        if (currAccounts.length === 1) {
+          matchedAccount = currAccounts[0];
+        }
       }
     }
 
     // Handle unmapped card
     if (!matchedAccount) {
-      if (unmappedAction === "ignore") {
+      // If default account is specified, use it
+      if (defaultAccountId) {
+        const def = accounts.find((a) => a.id === defaultAccountId);
+        if (def) matchedAccount = def;
+      }
+
+      // If still unmapped and policy is ignore, skip safely
+      if (!matchedAccount && unmappedAction === "ignore") {
         return res.status(200).json({
           success: true,
           ignored: true,
@@ -493,13 +505,7 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
         });
       }
 
-      // Fall back to default account if specified
-      if (defaultAccountId) {
-        const def = accounts.find((a) => a.id === defaultAccountId);
-        if (def) matchedAccount = def;
-      }
-
-      // If still null, fall back to first account
+      // If policy is default or no mapping matched, use first account
       if (!matchedAccount) {
         matchedAccount = accounts[0];
       }
