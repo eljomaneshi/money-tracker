@@ -99,9 +99,13 @@ function extractApiKey(req: Request): string | null {
 
   const authHeader = req.header("authorization");
   if (authHeader) {
-    const parts = authHeader.split(" ");
+    const trimmed = authHeader.trim();
+    const parts = trimmed.split(/\s+/);
     if (parts.length === 2 && (parts[0] === "Bearer" || parts[0] === "ApiKey")) {
       return parts[1].trim();
+    }
+    if (parts.length === 1 && (parts[0].startsWith("mt_") || parts[0].length > 10)) {
+      return parts[0].trim();
     }
   }
 
