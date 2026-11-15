@@ -15,6 +15,7 @@ async function main() {
   app.post("/x", (_req, res) => { res.json({ ok: true }); });
   app.get("/boom", () => { throw new Error("unexpected"); });
   app.get("/cors", () => { throw new Error("CORS blocked: origin"); });
+  app.get("/status-only", () => { throw Object.assign(new Error("secret detail"), { status: 404 }); });
   app.use(errorHandler);
 
   const server = app.listen(0);
@@ -30,7 +31,13 @@ async function main() {
     });
     assert(badJson.status === 400, `malformed JSON body returns 400 (got ${badJson.status})`);
     const badJsonBody: any = await badJson.json();
-    assert(typeof badJsonBody.error === "string" && badJsonBody.error.length > 0, "malformed JSON body returns an error message");
+    assert(typeof badJsonBody.error === "string" && badJsonBody.error.startsWith("Invalid request body:"), "malformed JSON body returns an invalid-body message");
+
+    // Only body-parser errors (which carry a `type`) may surface their 4xx and message.
+    const statusOnly = await fetch(`${base}/status-only`);
+    assert(statusOnly.status === 500, `non-body-parser error with a 4xx status still returns 500 (got ${statusOnly.status})`);
+    const statusOnlyBody: any = await statusOnly.json();
+    assert(statusOnlyBody.error === "Internal server error", "non-body-parser error message is not leaked");
 
     const boom = await fetch(`${base}/boom`);
     assert(boom.status === 500, `unexpected error still returns 500 (got ${boom.status})`);
