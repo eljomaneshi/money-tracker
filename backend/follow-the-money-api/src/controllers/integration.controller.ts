@@ -1169,7 +1169,7 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
         timestamp: new Date().toISOString(),
         contentType: req.headers["content-type"],
         bodyKeys: req.body && typeof req.body === "object" ? Object.keys(req.body) : [],
-        bodySnapshot: typeof req.body === "string" ? req.body.slice(0, 300) : JSON.stringify(req.body || {}).slice(0, 300),
+        bodySnapshot: JSON.stringify(req.body).slice(0, 300),
         resultStatus: responseBody.success ? (responseBody.ignored ? "ignored" : responseBody.duplicate ? "duplicate" : "recorded") : "error",
         resultMessage: responseBody.message || responseBody.error || "",
         error: responseBody.error,

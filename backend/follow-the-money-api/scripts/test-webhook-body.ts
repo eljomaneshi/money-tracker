@@ -29,6 +29,9 @@ assert(fromRawText.text === raw, "raw text body is exposed as trimmed text field
 const fromJsonScalar = normalizeWebhookBody('"ALL 900"');
 assert(fromJsonScalar.text === '"ALL 900"', "JSON scalar text is kept as raw text");
 
+// A JSON array in a text body is raw text, not fields.
+assert(normalizeWebhookBody('[{"amount":5}]').text === '[{"amount":5}]', "JSON array text is kept as raw text");
+
 // Already-parsed object bodies pass through unchanged.
 const obj = { amount: 5, merchant: "Spar" };
 assert(normalizeWebhookBody(obj) === obj, "object body is returned as-is");
