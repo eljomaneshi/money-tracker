@@ -92,6 +92,21 @@ function extractDigits(str: string): string | null {
   return match ? match[0] : null;
 }
 
+// Express 5 leaves req.body undefined when no parser matches, and text/* bodies arrive as strings.
+// Always hand the webhook a plain object: JSON-object text becomes fields, other text becomes { text }.
+export function normalizeWebhookBody(body: unknown): Record<string, any> {
+  if (body && typeof body === "object") return body as Record<string, any>;
+  if (typeof body !== "string") return {};
+  const trimmed = body.trim();
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+  } catch {
+    // not JSON: raw notification / OCR text
+  }
+  return trimmed ? { text: trimmed } : {};
+}
+
 function extractApiKey(req: Request): string | null {
   const headerKey = req.header("x-api-key");
   if (headerKey && headerKey.trim()) {
@@ -1124,35 +1139,16 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
       }
     }
 
-    const rawInputText = req.body.text ?? req.body.rawText ?? req.body.notification ?? req.body.message;
+    req.body = normalizeWebhookBody(req.body);
     let normalizedInputText = "";
 
-    // Handle case where iOS Shortcuts sends body as plain text string
-    if (typeof req.body === "string") {
-      console.log("[Webhook] Body received as plain text string, attempting JSON parse");
-      try {
-        const parsed = JSON.parse(req.body);
-        // Re-assign parsed body for downstream processing
-        Object.assign(req.body, {});
-        for (const [k, v] of Object.entries(parsed)) {
-          req.body[k] = v;
-        }
-      } catch {
-        // Body is raw notification text, not JSON
-        normalizedInputText = req.body.trim();
-        console.log("[Webhook] Body is raw text, not JSON:", normalizedInputText.slice(0, 200));
-      }
-    }
-
-    if (!normalizedInputText) {
-      const textField = req.body.text ?? req.body.rawText ?? req.body.notification ?? req.body.message;
-      if (Array.isArray(textField)) {
-        normalizedInputText = textField.map((t) => String(t || "").trim()).filter(Boolean).join("\n");
-      } else if (textField && typeof textField === "object") {
-        normalizedInputText = Object.values(textField).map((t) => String(t || "").trim()).filter(Boolean).join("\n");
-      } else if (typeof textField === "string") {
-        normalizedInputText = textField.trim();
-      }
+    const textField = req.body.text ?? req.body.rawText ?? req.body.notification ?? req.body.message;
+    if (Array.isArray(textField)) {
+      normalizedInputText = textField.map((t) => String(t || "").trim()).filter(Boolean).join("\n");
+    } else if (textField && typeof textField === "object") {
+      normalizedInputText = Object.values(textField).map((t) => String(t || "").trim()).filter(Boolean).join("\n");
+    } else if (typeof textField === "string") {
+      normalizedInputText = textField.trim();
     }
 
     const requestFingerprint = `${user.id}:${crypto.createHash("md5").update(normalizedInputText || JSON.stringify(req.body)).digest("hex")}`;
