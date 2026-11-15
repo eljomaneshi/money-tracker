@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from "express";
+import express, { Request, Response } from "express";
 import cors from "cors";
 import userRoutes from "./routes/userRoutes";
 import authRoutes from "./routes/auth.routes";
@@ -10,6 +10,7 @@ import noteRoutes from "./routes/note.routes";
 import accountActionRoutes from "./routes/accountAction.routes";
 import integrationRoutes from "./routes/integration.routes";
 import prisma from "./prisma";
+import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
 
@@ -51,6 +52,8 @@ app.options("/{*any}", cors(corsOptions));
 app.use(cors(corsOptions));
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.text({ type: "text/*" }));
 
 app.use("/users", userRoutes);
 app.use("/auth", authRoutes);
@@ -89,16 +92,6 @@ app.get("/health", async (_req: Request, res: Response) => {
     }
 });
 
-app.use(
-    (err: Error, _req: Request, res: Response, _next: NextFunction) => {
-        console.error("Error:", err);
-
-        if (err.message.startsWith("CORS blocked")) {
-            return res.status(403).json({ error: err.message });
-        }
-
-        res.status(500).json({ error: "Internal server error" });
-    }
-);
+app.use(errorHandler);
 
 export default app;
