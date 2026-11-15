@@ -56,7 +56,7 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   ],
   Entertainment: [
     "cinema", "cineplexx", "theatre", "concert", "ticket", "event", "pub",
-    "club", "game", "steam", "bowling", "museum", "festival",
+    "club", "game", "steam", "bowling", "museum", "festival", "easybet", "bet", "casino",
   ],
 };
 
@@ -127,6 +127,93 @@ export interface ParsedNotification {
   date?: Date;
   isRefund?: boolean;
   status?: string;
+}
+
+// Cleans phone status bar clutter, carrier headers, lock screen clock & widgets from OCR text
+export function cleanNotificationText(rawText: string): string {
+  if (!rawText) return "";
+  const rawLines = String(rawText).replace(/\r\n/g, "\n").split("\n");
+  const cleanedLines: string[] = [];
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const rawLine = rawLines[i];
+    let line = rawLine.trim();
+
+    // Preserve intentional blank line separators between notifications
+    if (!line) {
+      if (cleanedLines.length > 0 && cleanedLines[cleanedLines.length - 1] !== "") {
+        cleanedLines.push("");
+      }
+      continue;
+    }
+
+    // Remove leading card/notification emojis like 💳, 🛒, 🛍️, 🔔, ✉️, etc.
+    line = line.replace(/^[💳🛒🛍️🔔✉️📱💰💵💸\s•·|\-]+/, "").trim();
+    if (!line) continue;
+
+    // 1. Check if line is iOS / Android Lockscreen / Status Bar UI
+    // Standalone clock at top of screen, e.g. "17:09", "14:20", "17:08:30"
+    if (/^\d{1,2}:\d{2}(?::\d{2})?$/i.test(line)) {
+      continue;
+    }
+
+    // Lockscreen date headers, e.g. "Sat 17 Oct", "Saturday 17 October", "Sun 18 Oct 2026"
+    if (
+      /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|April|May|June|July|August|September|October|November|December)(?:\s+\d{2,4})?$/i.test(
+        line
+      )
+    ) {
+      continue;
+    }
+
+    // Lockscreen weather widget: e.g. "17° Mostly Sunny ↑18° ↓6°", "17° Mostl", "-2° Snow", "22° Clear"
+    if (/^-?\d{1,2}°\s*(?:[A-Za-z\s]+)?(?:↑\s*-?\d+°)?\s*(?:↓\s*-?\d+°)?$/i.test(line)) {
+      continue;
+    }
+
+    // Lockscreen system headers / utility buttons
+    if (
+      /^(?:Notification Centre|Notification Center|No older notifications|Swipe up to open|Press home to unlock|Swipe up to unlock|Face ID|Flashlight|Camera)$/i.test(
+        line
+      )
+    ) {
+      continue;
+    }
+
+    // Standalone relative time on its own line: e.g. "1h ago", "30m ago", "now", "just now"
+    if (/^(?:\d+\s*(?:h|m|s|d|min|mins|hr|hrs|hour|hours|day|days)\s*ago|now|just now)$/i.test(line)) {
+      continue;
+    }
+
+    // 2. Carrier & Status Bar artifacts:
+    // e.g. "VodafoneAL • | = 36 Sat 17 Oct 17:08 17° Mostl"
+    // e.g. "VodafoneAL • | = 36"
+    // e.g. "VodafoneAL 36%"
+    // e.g. "VodafoneAL 17:08"
+    // e.g. "VodafoneAL"
+    // e.g. "One.al 4G"
+    const isCarrierLine = /^(?:Vodafone(?:AL|\s*AL)?|One(?:\.al|\s*Albania)?|ALBtelecom|Telekom|Carrier|No Service|SOS)\b/i.test(line);
+    const hasPaymentKeywords = /\b(paid|spent|pages[eë]|blerje|transaksion|refund|refunded|rimburs|total|approved|sukses|contact|view in)\b/i.test(line);
+
+    if (isCarrierLine && !hasPaymentKeywords) {
+      // Pure carrier / status bar clutter at the top of a screenshot
+      continue;
+    }
+
+    if (isCarrierLine && hasPaymentKeywords) {
+      // Carrier was merged with real transaction line by OCR: strip leading carrier prefix
+      line = line.replace(/^(?:Vodafone(?:AL|\s*AL)?|One(?:\.al|\s*Albania)?|ALBtelecom|Telekom|Carrier)\s*[:•|=-]*\s*/i, "").trim();
+    }
+
+    cleanedLines.push(line);
+  }
+
+  // Trim trailing empty lines
+  while (cleanedLines.length > 0 && cleanedLines[cleanedLines.length - 1] === "") {
+    cleanedLines.pop();
+  }
+
+  return cleanedLines.join("\n");
 }
 
 // Check if raw OCR text is from an Apple Wallet transaction detail screen
@@ -272,6 +359,8 @@ export function parseTransactionFromText(rawText: string | string[] | any): Pars
     fullText = String(rawText).trim();
   }
 
+  // Pre-clean phone status bar, carrier clutter, lockscreen clock & widgets
+  fullText = cleanNotificationText(fullText) || fullText;
   if (!fullText) return {};
 
   // 0. Priority: If this is an Apple Wallet transaction screen, use specialized receipt parser
@@ -282,6 +371,7 @@ export function parseTransactionFromText(rawText: string | string[] | any): Pars
     }
   }
 
+  const lines = fullText.split("\n").map((l) => l.trim()).filter(Boolean);
   const lower = fullText.toLowerCase();
   const result: ParsedNotification = {};
 
@@ -296,17 +386,21 @@ export function parseTransactionFromText(rawText: string | string[] | any): Pars
     return undefined;
   };
 
-  // Detect Refund keywords
-  if (/\b(refund|refunded|reversal|rimbursim|rimbursuar)\b/i.test(fullText) || /^\s*\+\s*(?:[€$£]|ALL|EUR|GBP|USD)/i.test(fullText)) {
+  // 1. Detect Refund keywords / plus sign
+  if (
+    /\b(refund|refunded|refunding|reversal|rimbursim|rimbursuar|rimbursoi|kthim pagese|kthim|kthyer)\b/i.test(fullText) ||
+    /(?:^|\s)\+\s*(?:[€$£]|ALL|EUR|GBP|USD|LEK)?\s*[\d,]/i.test(fullText) ||
+    /status:\s*(?:refunded|refund|rimbursuar)/i.test(fullText)
+  ) {
     result.isRefund = true;
   }
 
   // Find the specific sentence or notification fragment that mentions payment / amount
-  const paymentSegmentRegex = /(?:you paid|paid|spent|pages[eë]|blerje|transaksion|payment|purchase)[\s\S]{5,150}?(?=\.(?!\d)|\n|$)/i;
+  const paymentSegmentRegex = /(?:you paid|paid|spent|pages[eë]|blerje|transaksion|payment|purchase|refund|refunded|rimbursim)[\s\S]{5,150}?(?=\.(?!\d)|\n|$)/i;
   const segmentMatch = fullText.match(paymentSegmentRegex);
   const targetText = segmentMatch ? segmentMatch[0] : fullText;
 
-  // 1. Check for Dual Currency format: e.g. "£26.94 (ALL 2,872)" or "26.94 GBP (2,872 ALL)"
+  // 2. Check for Dual Currency format: e.g. "£26.94 (ALL 2,872)" or "26.94 GBP (2,872 ALL)"
   const dualMatch = fullText.match(/(?:([£€$]|GBP|EUR|USD|ALL)\s*([\d,]+(?:\.\d+)?))\s*\((?:([£€$]|GBP|EUR|USD|ALL)\s*([\d,]+(?:\.\d+)?))\)/i);
   if (dualMatch) {
     const cur1 = normalizeCurrencyCode(dualMatch[1]);
@@ -324,7 +418,7 @@ export function parseTransactionFromText(rawText: string | string[] | any): Pars
     }
   }
 
-  // 2. Single Currency & Amount extraction (paired together so currency symbol matches amount)
+  // 3. Single Currency & Amount extraction (paired together so currency symbol matches amount)
   if (!result.amount) {
     const currWithNumRegex = /(?:([€$£]|ALL|EUR|GBP|USD|LEK)\s*([0-9]{1,3}(?:[,\s][0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?))|([0-9]{1,3}(?:[,\s][0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s*([€$£]|ALL|EUR|GBP|USD|LEK)/i;
     let currMatch = targetText.match(currWithNumRegex) || fullText.match(currWithNumRegex);
@@ -355,7 +449,7 @@ export function parseTransactionFromText(rawText: string | string[] | any): Pars
 
   // Fallback number search if not found above
   if (!result.amount) {
-    const verbMatch = fullText.match(/(?:paid|spent|vler[eë]|pages[eë]|blerje|amount|shum[aë]|euro|lek)\s*:?\s*([0-9]{1,3}(?:[,\s][0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i);
+    const verbMatch = fullText.match(/(?:paid|spent|vler[eë]|pages[eë]|blerje|amount|shum[aë]|euro|lek|refund)\s*:?\s*([0-9]{1,3}(?:[,\s][0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i);
     if (verbMatch) {
       const parsed = parseFloat(verbMatch[1].replace(/[\s,]/g, ""));
       if (!Number.isNaN(parsed) && parsed > 0) {
@@ -364,7 +458,7 @@ export function parseTransactionFromText(rawText: string | string[] | any): Pars
     }
   }
 
-  // 3. Card Digits or Bank Name
+  // 4. Card Digits or Bank Name
   const digitsMatch = fullText.match(/(?:\*|karten|kartes|card|ending|x+)\s*[*#\s]*([0-9]{4})\b/i);
   if (digitsMatch) {
     result.cardDigits = digitsMatch[1];
@@ -392,37 +486,101 @@ export function parseTransactionFromText(rawText: string | string[] | any): Pars
     result.cardName = "OTP";
   }
 
-  // 4. Extract Merchant
-  // First check Monzo lock screen notification layout: "Monzo \n Rossman & Lala \n ALL 2,872"
-  const monzoLayoutMatch = fullText.match(/Monzo\s+([A-Za-z0-9&.\- ]+?)\s+(?:ALL|EUR|GBP|USD|[€$£]|\d{1,2}:\d{2})/i);
-  if (monzoLayoutMatch && monzoLayoutMatch[1].trim().length >= 2 && !/^(card|payment|mastercard|approved)$/i.test(monzoLayoutMatch[1].trim())) {
-    result.merchant = monzoLayoutMatch[1].trim();
+  // 5. Merchant Extraction
+  const cleanCandidate = (cand: string): string => {
+    if (!cand) return "";
+    const stopWords = /(?:\s+(?:with|me|nga|on|using|approved|successful|dhe|date|sukses\w*|\*|\b\d{4}\b|\b\d+\s*(?:h|m|s|d|min|mins|hr|hrs|hour|hours|day|days)\s*ago\b|\b(?:yesterday|today|now)\b|\b\d{1,2}:\d{2}\b)[\s\S]*$)/i;
+    let cleaned = cand.replace(stopWords, "").trim();
+    cleaned = cleaned.replace(/^[💳🛒🛍️🔔✉️📱💰💵💸\s•·|\-:]+/, "").replace(/[\s•·|\-:]+$/, "").trim();
+    cleaned = cleaned.replace(/\s+\d+\s*(?:h|m|s|d|min|mins|hr|hrs|hour|hours|day|days)\s*ago\b/gi, "");
+    cleaned = cleaned.replace(/\s+(?:yesterday|today|now)\b/gi, "");
+    cleaned = cleaned.replace(/\s+\d{1,2}:\d{2}\b/g, "");
+    return cleaned.trim();
+  };
+
+  const isValidMerchant = (cand: string): boolean => {
+    if (!cand || cand.length < 2 || cand.length > 50) return false;
+    const lowerCand = cand.toLowerCase();
+    // Exclude banks / carriers / generic stop words / payment verbs
+    if (/^(?:the|a|an|me|te|tek|card|karten|kartes|your|payment|pages[eë]|blerje|transaksion|approved|total|status|mastercard|visa|debit|credit|refund|rimbursim|you spent|you paid|spent|paid|ju keni)$/i.test(cand)) return false;
+    if (/\b(?:you spent|you paid|spent|paid|pages[eë]|blerje|transaksion|ju keni kryer)\b/i.test(lowerCand)) return false;
+    if (/^(?:monzo|jet bank|jetbank|yuh|revolut|raiffeisen|bkt|credins|intesa|otp|bank)$/i.test(lowerCand)) return false;
+    if (/^(?:vodafone(?:al|\s*al)?|one(?:\.al|\s*albania)?|telekom|albtelecom)$/i.test(lowerCand)) return false;
+    return true;
+  };
+
+  // 5A. If Refund: Look for "refund from <Merchant>", "rimbursim nga <Merchant>", "<Merchant> refunded you"
+  if (result.isRefund) {
+    // Pattern 1: "... refund from <Merchant>" or "... rimbursim nga <Merchant>" or "... kthim nga <Merchant>"
+    const refundFromMatch = fullText.match(/(?:refund|refunded|rimbursim|rimbursuar|kthim pagese|kthim|reversal)\s*(?:prej\s*)?(?:of\s*)?(?:[€$£]|ALL|EUR|GBP|USD|LEK)?\s*[\d,.]*\s*(?:[€$£]|ALL|EUR|GBP|USD|LEK)?\s*(?:from|nga)\s+([^,\n\r]+)/i);
+    if (refundFromMatch) {
+      const cand = cleanCandidate(refundFromMatch[1]);
+      if (isValidMerchant(cand)) {
+        result.merchant = cand;
+      }
+    }
+
+    // Pattern 2: "<Merchant> refunded you" or "<Merchant> has refunded you" or "<Merchant> ju rimbursoi"
+    if (!result.merchant) {
+      const merchantRefundedMatch = fullText.match(/^([A-Za-z0-9&.\- ]{2,40}?)\s+(?:has\s+)?(?:refunded you|ju rimbursoi)/im);
+      if (merchantRefundedMatch) {
+        const cand = cleanCandidate(merchantRefundedMatch[1]);
+        if (isValidMerchant(cand)) {
+          result.merchant = cand;
+        }
+      }
+    }
+
+    // Pattern 3: General "from <Merchant>" or "nga <Merchant>"
+    if (!result.merchant) {
+      const fromMatch = fullText.match(/(?:from|nga)\s+([^,\n\r]+)/i);
+      if (fromMatch) {
+        const cand = cleanCandidate(fromMatch[1]);
+        if (isValidMerchant(cand)) {
+          result.merchant = cand;
+        }
+      }
+    }
   }
 
-  // Standard "at / to / tek / dyqani" pattern
+  // 5B. Monzo layout: "Monzo \n <Merchant> \n <Amount>"
+  if (!result.merchant && lines.length >= 2) {
+    if (/^monzo\b/i.test(lines[0])) {
+      const candidateLine = lines[1];
+      const isAmtOrDate = /(?:[€$£]|ALL|EUR|GBP|USD|LEK)\s*[\d,]+|[\d,]+\s*(?:[€$£]|ALL|EUR|GBP|USD|LEK)|\d{1,2}:\d{2}|\b(yesterday|today)\b/i.test(candidateLine);
+      const isPaymentSentence = /\b(?:you spent|you paid|paid|spent|pages[eë]|blerje|transaksion|refund|rimbursim|sent|transferred)\b/i.test(candidateLine);
+      if (!isAmtOrDate && !isPaymentSentence) {
+        const cand = cleanCandidate(candidateLine);
+        if (isValidMerchant(cand)) {
+          result.merchant = cand;
+        }
+      }
+    }
+  }
+
+  // 5C. Monzo legacy regex layout
+  if (!result.merchant) {
+    const monzoLayoutMatch = fullText.match(/Monzo\s+([A-Za-z0-9&.\- ]+?)\s+(?:ALL|EUR|GBP|USD|[€$£]|\d{1,2}:\d{2})/i);
+    if (monzoLayoutMatch) {
+      const cand = cleanCandidate(monzoLayoutMatch[1]);
+      if (isValidMerchant(cand) && !/\b(?:you spent|you paid|paid|spent|pages[eë]|blerje|transaksion|refund|rimbursim)\b/i.test(cand)) {
+        result.merchant = cand;
+      }
+    }
+  }
+
+  // 5D. Standard "at / to / tek / dyqani / merchant:" pattern
   if (!result.merchant) {
     const triggerRegex = /(?:at|to|tek|te|tek dyqani|te tregtari|aprovuar tek|dyqani|merchant:?)\s+/i;
     const matchTrigger = targetText.match(triggerRegex) || fullText.match(triggerRegex);
     const sourceTextForMerchant = segmentMatch ? targetText : fullText;
     if (matchTrigger && matchTrigger.index !== undefined) {
       const after = sourceTextForMerchant.slice(matchTrigger.index + matchTrigger[0].length).trim();
-      const stopWords = /(?:\s+(?:with|me|nga|on|using|approved|successful|dhe|date|sukses\w*|\*|\b\d{4}\b|\b\d+\s*(?:h|m|s|d|min|mins|hr|hrs|hour|hours|day|days)\s*ago\b|\b(?:yesterday|today|now)\b|\b\d{1,2}:\d{2}\b)[\s\S]*$)/i;
-      const merchantCandidate = after.replace(stopWords, "").trim();
-      if (merchantCandidate && merchantCandidate.length >= 2 && merchantCandidate.length <= 40) {
-        if (!/^(the|a|an|me|te|tek|card|karten|kartes|your)$/i.test(merchantCandidate)) {
-          result.merchant = merchantCandidate;
-        }
+      const cand = cleanCandidate(after);
+      if (isValidMerchant(cand)) {
+        result.merchant = cand;
       }
     }
-  }
-
-  // Final cleanup on merchant: strip any trailing relative time like "3h ago" or "now"
-  if (result.merchant) {
-    result.merchant = result.merchant
-      .replace(/\s+\d+\s*(?:h|m|s|d|min|mins|hr|hrs|hour|hours|day|days)\s*ago\b/gi, "")
-      .replace(/\s+(?:yesterday|today|now)\b/gi, "")
-      .replace(/\s+\d{1,2}:\d{2}\b/g, "")
-      .trim();
   }
 
   return result;
@@ -430,7 +588,9 @@ export function parseTransactionFromText(rawText: string | string[] | any): Pars
 
 export function splitIntoTransactionChunks(rawText: string): string[] {
   if (!rawText) return [];
-  const normalized = String(rawText).replace(/\r\n/g, "\n").trim();
+  const cleaned = cleanNotificationText(rawText);
+  const normalized = (cleaned || String(rawText)).replace(/\r\n/g, "\n").trim();
+  if (!normalized) return [];
 
   // 0. If it is an Apple Wallet receipt screen, it is always a single transaction
   if (isAppleWalletReceipt(normalized)) {
@@ -442,10 +602,16 @@ export function splitIntoTransactionChunks(rawText: string): string[] {
 
   // 2. If only 1 chunk, look for repeating bank/app headers or payment verbs on separate lines
   if (chunks.length <= 1) {
-    const boundaryRegex = /(?:^|\n)(?=(?:Monzo|Jet Bank|JetBank|Yuh|Revolut|Raiffeisen|BKT|Credins|Intesa|OTP|You paid|You spent|Pages[eë]|Blerje|Transaksion)\b)/gi;
-    const splitByHeader = normalized.split(boundaryRegex).map((c) => c.trim()).filter(Boolean);
-    if (splitByHeader.length > 1) {
-      chunks = splitByHeader;
+    const bankHeaderRegex = /(?:^|\n)(?=(?:Monzo|Jet Bank|JetBank|Yuh|Revolut|Raiffeisen|BKT|Credins|Intesa|OTP)\b)/gi;
+    const splitByBank = normalized.split(bankHeaderRegex).map((c) => c.trim()).filter(Boolean);
+    if (splitByBank.length > 1) {
+      chunks = splitByBank;
+    } else {
+      const verbRegex = /(?:^|\n)(?=(?:You paid|You spent|Pages[eë]|Blerje|Transaksion|Refund|Rimbursim)\b)/gi;
+      const splitByVerb = normalized.split(verbRegex).map((c) => c.trim()).filter(Boolean);
+      if (splitByVerb.length > 1) {
+        chunks = splitByVerb;
+      }
     }
   }
 
@@ -540,7 +706,7 @@ export async function processExpenseItem(
     merchant ||
     description ||
     rawInputSnippet ||
-    "Card Transaction"
+    (isRefund ? "Refund" : "Card Transaction")
   ).trim();
 
   const finalCategory =
@@ -891,12 +1057,34 @@ interface CachedWebhookResponse {
 }
 const recentWebhookRequests = new Map<string, CachedWebhookResponse>();
 
+// In-memory debug log for recent webhook calls (last 50)
+interface WebhookDebugEntry {
+  timestamp: string;
+  contentType: string | undefined;
+  bodyKeys: string[];
+  bodySnapshot: string;
+  resultStatus: string;
+  resultMessage: string;
+  error?: string;
+}
+const webhookDebugLog: WebhookDebugEntry[] = [];
+
 // Quick Expense Webhook (called by Apple Shortcuts or other webhooks)
 export async function quickExpenseWebhook(req: Request, res: Response) {
   try {
+    // Log incoming webhook request for debugging Apple Pay/Shortcuts issues
+    console.log("[Webhook] Incoming request:", {
+      contentType: req.headers["content-type"],
+      bodyKeys: req.body ? Object.keys(req.body) : "NO_BODY",
+      bodySnapshot: req.body ? JSON.stringify(req.body).slice(0, 500) : "EMPTY",
+      hasAmount: req.body?.amount !== undefined,
+      hasText: !!(req.body?.text || req.body?.rawText || req.body?.notification || req.body?.message),
+    });
+
     const apiKey = extractApiKey(req);
 
     if (!apiKey) {
+      console.log("[Webhook] REJECTED: No API key found in request headers");
       return res.status(401).json({
         error: "Missing API Key. Provide it in X-API-Key header or Authorization: Bearer <key>.",
       });
@@ -907,6 +1095,7 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
     });
 
     if (!user) {
+      console.log("[Webhook] REJECTED: Invalid API key");
       return res.status(401).json({ error: "Invalid API key" });
     }
 
@@ -919,6 +1108,7 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
     });
 
     if (accounts.length === 0) {
+      console.log("[Webhook] REJECTED: No active accounts for user", user.id);
       return res.status(400).json({
         error: "No active accounts found in your MoneyTracker ledger. Please add an account first.",
       });
@@ -936,12 +1126,33 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
 
     const rawInputText = req.body.text ?? req.body.rawText ?? req.body.notification ?? req.body.message;
     let normalizedInputText = "";
-    if (Array.isArray(rawInputText)) {
-      normalizedInputText = rawInputText.map((t) => String(t || "").trim()).filter(Boolean).join("\n");
-    } else if (rawInputText && typeof rawInputText === "object") {
-      normalizedInputText = Object.values(rawInputText).map((t) => String(t || "").trim()).filter(Boolean).join("\n");
-    } else if (typeof rawInputText === "string") {
-      normalizedInputText = rawInputText.trim();
+
+    // Handle case where iOS Shortcuts sends body as plain text string
+    if (typeof req.body === "string") {
+      console.log("[Webhook] Body received as plain text string, attempting JSON parse");
+      try {
+        const parsed = JSON.parse(req.body);
+        // Re-assign parsed body for downstream processing
+        Object.assign(req.body, {});
+        for (const [k, v] of Object.entries(parsed)) {
+          req.body[k] = v;
+        }
+      } catch {
+        // Body is raw notification text, not JSON
+        normalizedInputText = req.body.trim();
+        console.log("[Webhook] Body is raw text, not JSON:", normalizedInputText.slice(0, 200));
+      }
+    }
+
+    if (!normalizedInputText) {
+      const textField = req.body.text ?? req.body.rawText ?? req.body.notification ?? req.body.message;
+      if (Array.isArray(textField)) {
+        normalizedInputText = textField.map((t) => String(t || "").trim()).filter(Boolean).join("\n");
+      } else if (textField && typeof textField === "object") {
+        normalizedInputText = Object.values(textField).map((t) => String(t || "").trim()).filter(Boolean).join("\n");
+      } else if (typeof textField === "string") {
+        normalizedInputText = textField.trim();
+      }
     }
 
     const requestFingerprint = `${user.id}:${crypto.createHash("md5").update(normalizedInputText || JSON.stringify(req.body)).digest("hex")}`;
@@ -956,12 +1167,43 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
         statusCode,
         body: responseBody,
       });
+
+      // Log to debug history
+      const entry: WebhookDebugEntry = {
+        timestamp: new Date().toISOString(),
+        contentType: req.headers["content-type"],
+        bodyKeys: req.body && typeof req.body === "object" ? Object.keys(req.body) : [],
+        bodySnapshot: typeof req.body === "string" ? req.body.slice(0, 300) : JSON.stringify(req.body || {}).slice(0, 300),
+        resultStatus: responseBody.success ? (responseBody.ignored ? "ignored" : responseBody.duplicate ? "duplicate" : "recorded") : "error",
+        resultMessage: responseBody.message || responseBody.error || "",
+        error: responseBody.error,
+      };
+      webhookDebugLog.unshift(entry);
+      if (webhookDebugLog.length > 50) webhookDebugLog.length = 50;
+      console.log("[Webhook] Response:", statusCode, entry.resultStatus, entry.resultMessage.slice(0, 150));
+
       return res.status(statusCode).json(responseBody);
     };
 
     // If explicit amount is provided (e.g. from simulator or structured webhook)
     if (req.body.amount !== undefined && req.body.amount !== null && req.body.amount !== "") {
+      console.log("[Webhook] Structured payload detected:", {
+        amount: req.body.amount,
+        currency: req.body.currency,
+        merchant: req.body.merchant,
+        cardName: req.body.cardName,
+        date: req.body.date,
+        isRefund: req.body.isRefund,
+      });
       const result = await processExpenseItem(req.body, user, accounts, rates);
+      console.log("[Webhook] processExpenseItem result:", {
+        status: result.status,
+        message: result.message,
+        merchant: result.merchant,
+        numericAmount: result.numericAmount,
+        finalDeductionAmount: result.finalDeductionAmount,
+        accountName: result.account?.name,
+      });
       if (result.status === "invalid") {
         return sendResponse(400, { error: result.error || result.message });
       }
@@ -984,18 +1226,23 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
 
     // Otherwise, parse from text
     if (!normalizedInputText) {
+      console.log("[Webhook] REJECTED: No amount field and no text field found. Body keys:", Object.keys(req.body));
       return sendResponse(400, {
         error: "Amount is required. Could not automatically extract an amount. Server received: (EMPTY/NO TEXT SENT)",
       });
     }
 
+    const cleanedInputText = cleanNotificationText(normalizedInputText);
+    const effectiveInputText = cleanedInputText || normalizedInputText;
+
     // Check if the text contains multiple transactions
-    const chunks = splitIntoTransactionChunks(normalizedInputText);
+    const chunks = splitIntoTransactionChunks(effectiveInputText);
     const candidateItems: ProcessExpenseItemParams[] = chunks.map((chunk) => {
       const parsed = parseTransactionFromText(chunk);
+      const cleanChunk = cleanNotificationText(chunk) || chunk;
       return {
         ...parsed,
-        rawInputSnippet: chunk.slice(0, 45).trim(),
+        rawInputSnippet: parsed.merchant || cleanChunk.slice(0, 45).trim(),
         category: req.body.category,
         date: req.body.date || parsed.date,
         isRefund: req.body.isRefund ?? parsed.isRefund,
@@ -1050,10 +1297,16 @@ export async function quickExpenseWebhook(req: Request, res: Response) {
     }
 
     // Single transaction fallback (or when only 1 valid item found)
-    const singleParsed = validItems[0] || parseTransactionFromText(normalizedInputText);
+    const singleParsed = validItems[0] || parseTransactionFromText(effectiveInputText);
+    const fallbackSnippet =
+      singleParsed.merchant ||
+      validItems[0]?.rawInputSnippet ||
+      cleanNotificationText(normalizedInputText).slice(0, 45).trim() ||
+      (singleParsed.isRefund ? "Refund" : "Card Transaction");
+
     const singleItem: ProcessExpenseItemParams = {
       ...singleParsed,
-      rawInputSnippet: normalizedInputText.slice(0, 45).trim(),
+      rawInputSnippet: fallbackSnippet,
       category: req.body.category,
       date: req.body.date || singleParsed.date,
       isRefund: req.body.isRefund ?? singleParsed.isRefund,

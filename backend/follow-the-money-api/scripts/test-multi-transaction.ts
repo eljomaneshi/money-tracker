@@ -63,4 +63,71 @@ const t5 = parseTransactionFromText(chunks3[0]);
 assert(t5.amount === 26.94, "Expected 26.94");
 assert(t5.currency === "GBP", "Expected GBP");
 
-console.log("All multi-transaction parsing tests passed successfully! 🎉");
+// Case 4: Lock screen notification screenshot with VodafoneAL carrier & lockscreen widgets
+const lockscreenRefund = `
+VodafoneAL • | = 36 Sat 17 Oct 17:08 17° Mostl
+Notification Centre
+Monzo
+1h ago
+💳 £42.30 refund from Easybet
+`;
+
+const chunks4 = splitIntoTransactionChunks(lockscreenRefund);
+console.log("Chunks 4:", chunks4.length);
+assert(chunks4.length === 1, "Expected 1 clean chunk for lockscreen notification");
+const t6 = parseTransactionFromText(chunks4[0]);
+assert(t6.amount === 42.30, `Expected 42.30, got ${t6.amount}`);
+assert(t6.currency === "GBP", `Expected GBP, got ${t6.currency}`);
+assert(t6.merchant === "Easybet", `Expected Easybet, got ${t6.merchant}`);
+assert(t6.isRefund === true, `Expected isRefund true, got ${t6.isRefund}`);
+assert(t6.cardName === "Monzo Mastercard", `Expected Monzo Mastercard, got ${t6.cardName}`);
+
+// Verify description format for refund
+const baseDesc4 = (t6.merchant || "Card Transaction").trim();
+const refundDesc4 = t6.isRefund ? (baseDesc4.toLowerCase().includes("refund") ? baseDesc4 : `Refund: ${baseDesc4}`) : baseDesc4;
+assert(refundDesc4 === "Refund: Easybet", `Expected "Refund: Easybet", got "${refundDesc4}"`);
+
+// Case 5: Pure refund line
+const pureRefund = "£42.30 refund from Easybet";
+const t7 = parseTransactionFromText(pureRefund);
+assert(t7.amount === 42.30, `Expected 42.30, got ${t7.amount}`);
+assert(t7.currency === "GBP", `Expected GBP, got ${t7.currency}`);
+assert(t7.merchant === "Easybet", `Expected Easybet, got ${t7.merchant}`);
+assert(t7.isRefund === true, `Expected isRefund true, got ${t7.isRefund}`);
+
+// Case 6: Albanian bank refund with VodafoneAL header
+const albanianRefund = `
+VodafoneAL
+Jet Bank: Rimbursim prej 4500 ALL nga Easybet
+`;
+const chunks6 = splitIntoTransactionChunks(albanianRefund);
+assert(chunks6.length === 1, "Expected 1 chunk for Albanian refund");
+const t8 = parseTransactionFromText(chunks6[0]);
+assert(t8.amount === 4500, `Expected 4500, got ${t8.amount}`);
+assert(t8.currency === "ALL", `Expected ALL, got ${t8.currency}`);
+assert(t8.merchant === "Easybet", `Expected Easybet, got ${t8.merchant}`);
+assert(t8.isRefund === true, `Expected isRefund true, got ${t8.isRefund}`);
+
+// Case 7: Stacked lock screen notifications starting with VodafoneAL
+const stackedWithVodafone = `
+VodafoneAL • | = 36 Sat 17 Oct 17:08 17° Mostl
+Notification Centre
+Monzo
+1h ago
+💳 £42.30 refund from Easybet
+
+Monzo
+2h ago
+You spent £15.20 at Sainsbury's
+`;
+const chunks7 = splitIntoTransactionChunks(stackedWithVodafone);
+console.log("Chunks 7:", chunks7.length);
+assert(chunks7.length === 2, "Expected 2 chunks for stacked lockscreen notifications");
+const t9 = parseTransactionFromText(chunks7[0]);
+assert(t9.merchant === "Easybet", `Expected Easybet, got ${t9.merchant}`);
+assert(t9.isRefund === true, `Expected isRefund true, got ${t9.isRefund}`);
+const t10 = parseTransactionFromText(chunks7[1]);
+assert(t10.merchant === "Sainsbury's", `Expected Sainsbury's, got ${t10.merchant}`);
+assert(t10.amount === 15.20, `Expected 15.20, got ${t10.amount}`);
+
+console.log("All multi-transaction and lockscreen parsing tests passed successfully! 🎉");

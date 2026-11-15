@@ -51,6 +51,8 @@ app.options("/{*any}", cors(corsOptions));
 app.use(cors(corsOptions));
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.text({ type: "text/*" }));
 
 app.use("/users", userRoutes);
 app.use("/auth", authRoutes);
